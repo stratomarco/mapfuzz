@@ -1,0 +1,19 @@
+# build outputs
+targets/*/.build/
+targets/*/fuzz_*
+!targets/*/fuzz_*.cpp
+*.o
+*.a
+
+# libFuzzer artifacts
+crash-*
+leak-*
+timeout-*
+oom-*
+*.profraw
+
+# fuzzing corpus growth (seed corpus is tracked; runtime corpus is not)
+corpus_run/
+
+# EMBARGOED: live reproducers and undisclosed findings. Never push publicly.
+PRIVATE_findings/

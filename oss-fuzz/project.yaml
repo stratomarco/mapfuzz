@@ -1,0 +1,13 @@
+homepage: "https://github.com/stratomarco/mapfuzz"
+language: c++
+primary_contact: "REPLACE_WITH_CONTACT_EMAIL"
+main_repo: "https://github.com/stratomarco/mapfuzz"
+fuzzing_engines:
+  - libfuzzer
+  - afl
+sanitizers:
+  - address
+  - undefined
+architectures:
+  - x86_64
+  - i386

@@ -33,6 +33,31 @@ fi
 git -C "$SRC" fetch --depth 1 origin "$LLAMA_COMMIT"
 git -C "$SRC" checkout -q "$LLAMA_COMMIT"
 
+# Optional: apply local fuzz-blocker patches so the fuzzer is not walled off by
+# known shallow faults. Research instrument only, never submitted upstream.
+# See fuzz-blockers/README.md.
+git -C "$SRC" checkout -q -- ggml/src/gguf.cpp 2>/dev/null || true
+if [ "${APPLY_FUZZ_BLOCKERS:-0}" = "1" ]; then
+    PATCH="$HERE/fuzz-blockers/0001-known-bugs.patch"
+    # Count the hunks the patch claims to add, so we can verify they all land.
+    # Never trust git apply's exit code alone: a patch missing a hunk can still
+    # apply "successfully" and silently leave a known bug in the build.
+    want=$(grep -c 'FUZZ-BLOCKER' "$PATCH")
+    if ! git -C "$SRC" apply "$PATCH"; then
+        echo "fuzz-blockers: ERROR git apply failed" >&2
+        exit 1
+    fi
+    got=$(grep -c 'FUZZ-BLOCKER' "$SRC/ggml/src/gguf.cpp" || true)
+    if [ "$got" != "$want" ]; then
+        echo "fuzz-blockers: ERROR expected $want hunks in source, found $got" >&2
+        echo "fuzz-blockers: the patch did not fully apply; aborting before build" >&2
+        exit 1
+    fi
+    echo "fuzz-blockers: applied and verified $got/$want hunks"
+else
+    echo "fuzz-blockers: not applied (set APPLY_FUZZ_BLOCKERS=1 to enable)"
+fi
+
 # --- build instrumented ggml static libs (CPU only) ------------------------
 cmake -S "$SRC" -B "$GGML_BUILD" -G Ninja \
     -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" \

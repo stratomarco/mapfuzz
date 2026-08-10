@@ -1,0 +1,2 @@
+==999==ERROR: AddressSanitizer: heap-buffer-overflow on address 0xdeadbeef
+SUMMARY: AddressSanitizer: heap-buffer-overflow /src/parser.c:412:9 in parse_header

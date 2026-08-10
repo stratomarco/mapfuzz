@@ -1,0 +1,2 @@
+thread '<unnamed>' (136819) panicked at /home/stratomarco/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokenizers-0.21.4/src/decoders/mod.rs:90:63:
+called `Result::expect()` on an `Err` value: Error("Helper")

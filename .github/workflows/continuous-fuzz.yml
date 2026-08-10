@@ -1,0 +1,61 @@
+name: continuous-fuzz
+
+# Short fuzzing on every push / PR, plus a nightly longer run. Each target builds
+# its harness, runs a time-boxed campaign, and pipes any crash reports through
+# chassis/triage. The job fails if triage finds a 'real' bucket, so a genuine new
+# crash blocks the merge; shallow blockers and review-class faults do not.
+#
+# This is the ClusterFuzzLite-style "continuous" layer. GGUF runs here because
+# its blockers are public. The tokenizers and pytorch targets are listed but
+# gated off by default: their findings/blockers are embargoed, so enabling them
+# in a public CI would disclose. Enable per-target once a finding is reported.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"   # nightly longer run
+
+jobs:
+  gguf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+      - name: Build GGUF harness (with public fuzz-blockers)
+        working-directory: targets/gguf
+        run: APPLY_FUZZ_BLOCKERS=1 ./build.sh
+      - name: Fuzz (short on PR, longer nightly)
+        working-directory: targets/gguf
+        run: |
+          DUR=120
+          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1800; fi
+          mkdir -p corpus_run && cp corpus/seed_minimal.gguf corpus_run/ || true
+          ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 -artifact_prefix=artifacts/ corpus_run/ 2>run.log || true
+      - name: Triage crashes
+        run: |
+          mkdir -p reports
+          for f in targets/gguf/artifacts/crash-* targets/gguf/artifacts/timeout-*; do
+            [ -e "$f" ] || continue
+            targets/gguf/fuzz_gguf "$f" 2>"reports/$(basename "$f").txt" || true
+          done
+          python3 -m chassis.triage reports/
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gguf-fuzz-artifacts
+          path: |
+            targets/gguf/artifacts/
+            targets/gguf/run.log
+          if-no-files-found: ignore
+
+  triage-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Triage unit tests
+        run: python3 chassis/tests/test_triage.py

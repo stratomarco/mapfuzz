@@ -1,0 +1,2 @@
+==2517==ERROR: AddressSanitizer: FPE on unknown address 0x5d17cb1e2ab4
+SUMMARY: AddressSanitizer: FPE /home/stratomarco/mapfuzz/targets/gguf/.build/llama.cpp/ggml/src/gguf.cpp:685:34 in gguf_init_from_reader(gguf_reader const&, gguf_init_params)

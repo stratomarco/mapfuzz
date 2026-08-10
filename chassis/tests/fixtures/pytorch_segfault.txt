@@ -1,0 +1,2 @@
+==123== ERROR: libFuzzer: deadly signal
+Segmentation fault (core dumped)

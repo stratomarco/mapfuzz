@@ -26,3 +26,7 @@ targets/*/fuzz/artifacts/
 # UNREPORTED bug. A blocker patch for an unreported finding is a disclosure
 # artifact; keep it local until the finding is reported.
 targets/*/.tokenizers-src/
+
+# python bytecode
+__pycache__/
+*.pyc

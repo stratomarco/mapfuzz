@@ -1,0 +1,2 @@
+/home/stratomarco/mapfuzz/targets/gguf/.build/llama.cpp/ggml/src/gguf.cpp:194: GGML_ASSERT(type_to_gguf_type<T>::value == type) failed
+==115512== ERROR: libFuzzer: deadly signal

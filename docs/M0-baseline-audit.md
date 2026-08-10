@@ -33,3 +33,15 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 ## SentencePiece [audited, deferred]
 
 - Result: confirmed in OSS-Fuzz (`projects/sentencepiece/project.yaml` returns 200). Watched. Deferred.
+
+## PyTorch weights_only unpickler [selected target]
+
+- OSS-Fuzz: `projects/pytorch/project.yaml` returns 404 (not continuously fuzzed publicly).
+- Active area: CVE-2025-32434 (legacy .tar bypass, fixed 2.6.0), CVE-2026-24747 (opcode/metadata memory corruption in weights_only unpickler, fixed 2.10.0). Both fixes verified present in current `main` source.
+- Entry point verified: `torch._weights_only_unpickler.load` (line 592).
+- Result: high-value, active, not continuously fuzzed. Target the current release to hunt the next gap. Scope limited to defect demonstration (crashes / unexpected failures in the restricted path), not weaponized exploits.
+
+## ONNX [audited, deferred]
+
+- `onnx` is in OSS-Fuzz (200) and ships a full `onnx/fuzz/` directory (fuzz_model_loader, fuzz_parser, fuzz_shape_inference, fuzz_checker, seed-corpus generator, CI workflow). Format loader already continuously fuzzed. Deferred.
+- `onnxruntime` not in OSS-Fuzz (404), but its format-load path overlaps the already-fuzzed onnx protobuf parser; marginal open ground is narrow. Not selected.

@@ -29,3 +29,20 @@ Reading: a real parser finding comes with a sanitizer report. A signal-less, ins
 ## General
 
 Most of this session's lost time was archaeology on stale artifacts. The chassis features already on the roadmap (C1 crash dedup by location, C2 shallow-blocker classifier) exist precisely to automate the verify-before-trust checks done by hand here. This log is the evidence for building them before the next target.
+
+## Registry-crate edits do not rebuild; use a local checkout plus [patch]
+
+Symptom: a fix edited directly into a dependency's source under `~/.cargo/registry` appeared correct on disk (grep confirmed it), but the rebuilt fuzzer kept hitting the patched bug, and the build finished in a fraction of a second with no compile.
+Cause: cargo fingerprints registry crates by checksum and will not recompile an edited registry copy; it reuses the cached artifact. The source was patched, the binary was not.
+Guardrail: to patch a dependency for fuzzing, clone it at the pinned version, edit the clone, and wire it in with `[patch.crates-io] name = { path = "..." }`. Confirm cargo actually rebuilds by seeing `Compiling <crate>` with the local path in the build output.
+
+## Verify a fix behaviorally, not by a proxy string
+
+Symptom: after patching a panic, a check `strings binary | grep -c 'Helper'` returned 120, suggesting the fix had not taken.
+Cause: the marker was a common substring. The codebase has many `...Helper` type names, so the count reflected unrelated identifiers, not the panic. The proxy was meaningless.
+Guardrail: prove a fix by behavior. Run the known reproducer through the freshly built binary; if the input that used to crash now parses cleanly, the fix is genuinely in the binary. A string grep is only trustworthy when the string is unique to the thing being checked.
+
+## A fuzz-blocker for an unreported bug is a disclosure artifact
+
+Symptom: n/a (process rule learned while packaging).
+Principle: a fuzz-blocker patch encodes the exact fix at the exact location of a bug. For an already-public bug that is harmless; for an unreported, embargoed finding it discloses the bug. Guardrail: commit blockers only for already-public bugs. Keep blockers for embargoed findings local and gitignored alongside the reproducer, until the finding is reported.

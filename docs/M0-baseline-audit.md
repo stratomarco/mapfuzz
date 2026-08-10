@@ -18,3 +18,18 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 1. Search the upstream repository for existing fuzz targets.
 2. Check OSS-Fuzz and ClusterFuzzLite for an existing integration and its reported coverage.
 3. Record which load paths remain unreached.
+
+## tokenizers (HuggingFace) [T1]
+
+- Checked: OSS-Fuzz `projects/tokenizers/project.yaml` returns HTTP 404 (positive control `sentencepiece` returns 200), and a fresh clone of huggingface/tokenizers contains no `fuzz/` directory or fuzz target.
+- Result: open ground. No in-repo harness, not in OSS-Fuzz, no published fuzzing surfaced.
+- Entry point verified from source: `Tokenizer::from_bytes` at `tokenizer/mod.rs:473`.
+- Caveat: absence of public evidence is not proof of no private or academic fuzzing.
+
+## safetensors [audited, deferred]
+
+- Result: not open. Ships its own fuzz target (`safetensors/fuzz/`), runs a per-commit automated security audit, and the core is deliberately minimal (~400 lines) with sequential offset validation. Deferred as already well-covered.
+
+## SentencePiece [audited, deferred]
+
+- Result: confirmed in OSS-Fuzz (`projects/sentencepiece/project.yaml` returns 200). Watched. Deferred.

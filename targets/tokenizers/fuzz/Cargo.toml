@@ -1,0 +1,23 @@
+[package]
+name = "tokenizers-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# Pin the target crate for reproducibility. Bumping this pin requires
+# re-verifying the entry point in fuzz_targets/ against the new source.
+# default-features = false keeps the build light (no onig C dep, no network
+# http feature). Enabling default features widens the parse surface; see README.
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
+
+[[bin]]
+name = "from_bytes"
+path = "fuzz_targets/from_bytes.rs"
+test = false
+doc = false
+bench = false

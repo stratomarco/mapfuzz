@@ -17,3 +17,12 @@ corpus_run/
 
 # EMBARGOED: live reproducers and undisclosed findings. Never push publicly.
 PRIVATE_findings/
+
+# cargo-fuzz build + runtime artifacts (artifacts/ holds live crash reproducers)
+targets/*/fuzz/target/
+targets/*/fuzz/corpus/
+targets/*/fuzz/artifacts/
+# EMBARGOED: patched dependency checkout used as a fuzz-blocker for an
+# UNREPORTED bug. A blocker patch for an unreported finding is a disclosure
+# artifact; keep it local until the finding is reported.
+targets/*/.tokenizers-src/

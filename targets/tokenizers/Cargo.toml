@@ -1,0 +1,10 @@
+# Stub host crate so cargo-fuzz has a package to attach its fuzz/ directory to.
+# We fuzz the external `tokenizers` crate, so this crate is intentionally empty.
+[package]
+name = "tokenizers-target"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+path = "src/lib.rs"

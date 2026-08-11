@@ -72,8 +72,35 @@ Python + pip. Installs torch and atheris.
 
 ```
 ./build.sh
+# blind harness (baseline; exhausts the shallow layer quickly):
 python3 harness/fuzz_weights_only.py -max_total_time=600 -rss_limit_mb=4096 corpus/
+# structure-aware generator (the productive one; reaches the tensor backend):
+python3 harness/fuzz_rebuild_args.py -max_total_time=600 -rss_limit_mb=4096
+# coverage-guided STABLE generator (fixed-layout decode; libFuzzer steers structure):
+python3 harness/fuzz_rebuild_args_stable.py --selftest
+python3 harness/fuzz_rebuild_args_stable.py -max_total_time=600 -rss_limit_mb=4096
+# storage-backed OOB (probe first, then campaign):
+python3 harness/fuzz_storage_oob.py --selftest
+python3 harness/fuzz_storage_oob.py -max_total_time=600 -rss_limit_mb=4096
+# container path: declared-vs-actual storage size mismatch (probe first):
+python3 harness/fuzz_storage_mismatch.py --selftest
+python3 harness/fuzz_storage_mismatch.py -max_total_time=600 -rss_limit_mb=4096
 ```
+
+Four harnesses, increasing depth. `fuzz_weights_only` mutates raw bytes (opcode
+parser; blind baseline found nothing in 6M runs). `fuzz_rebuild_args` generates
+valid calls to `_rebuild_meta_tensor_no_storage` and fuzzes size/stride, reaching
+`empty_strided` (verified reaching the backend by coverage growth; clean in 13M
+runs, but the meta path has no real buffer). `fuzz_storage_oob` supplies a small
+Python storage and fuzzes size/stride/offset to `_rebuild_tensor_v2`; it is
+neutralized because torch RESIZES the Python storage to fit, so it cannot create
+a real OOB (a documented negative result). `fuzz_storage_mismatch` is the answer
+to that: it mutates a storage record's physical length inside a real checkpoint
+zip so the declared nbytes disagrees with the actual record, reaching
+`get_storage_from_record` in C++, which cannot resize a short record. That is the
+CVE-2026-24747 surface. Always run `--selftest` first; for the container harness
+the self-test also proves the repackaged zip is torch-readable, so a
+wholesale-rejected input never produces a false-clean campaign.
 
 ## Status
 

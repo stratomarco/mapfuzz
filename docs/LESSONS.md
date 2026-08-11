@@ -46,3 +46,16 @@ Guardrail: prove a fix by behavior. Run the known reproducer through the freshly
 
 Symptom: n/a (process rule learned while packaging).
 Principle: a fuzz-blocker patch encodes the exact fix at the exact location of a bug. For an already-public bug that is harmless; for an unreported, embargoed finding it discloses the bug. Guardrail: commit blockers only for already-public bugs. Keep blockers for embargoed findings local and gitignored alongside the reproducer, until the finding is reported.
+
+## Structure-stable encoding makes coverage guidance work on generators
+
+A generator that draws from FuzzedDataProvider in a mutation-unstable order
+(variable-length draws, counts drawn before the values they size) breaks coverage
+guidance: libFuzzer mutates raw bytes, but a one-byte flip reshuffles the whole
+generated structure, so the fuzzer cannot attribute a coverage change to a field.
+Guardrail: use a FIXED-LAYOUT decode. Read every choice and value from a fixed
+byte offset with fixed width; reserve slots for unused capacity so positions never
+shift. Then a value-byte flip changes exactly one field, and libFuzzer's coverage-
+guided byte mutations become coverage-guided structural mutations. Verify the
+property directly: enumerate single-byte flips and confirm value-slot flips change
+one field (fuzz_rebuild_args_stable.py --selftest does this).

@@ -59,3 +59,15 @@ shift. Then a value-byte flip changes exactly one field, and libFuzzer's coverag
 guided byte mutations become coverage-guided structural mutations. Verify the
 property directly: enumerate single-byte flips and confirm value-slot flips change
 one field (fuzz_rebuild_args_stable.py --selftest does this).
+
+## Differential oracles need structure-aware input too (native-code blind spot)
+
+A cross-implementation differential oracle (fast vs slow tokenizer, same vocab,
+divergence = bug) is a new kind of oracle that finds non-crashing bugs. But when
+both implementations are native (Rust/C) extensions, libFuzzer sees little
+instrumented code and coverage-guidance is weak (coverage stays flat). Random
+text mutation then mostly produces agreement (both map junk to [UNK]).
+Guardrail: pair a differential oracle with a structure-aware generator aimed at
+the divergence-prone categories (Unicode normalization forms, combining marks,
+control chars, byte-vs-char boundaries, subword-merge boundaries), not raw bytes.
+The oracle and the generator compose.

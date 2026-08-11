@@ -45,3 +45,10 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 
 - `onnx` is in OSS-Fuzz (200) and ships a full `onnx/fuzz/` directory (fuzz_model_loader, fuzz_parser, fuzz_shape_inference, fuzz_checker, seed-corpus generator, CI workflow). Format loader already continuously fuzzed. Deferred.
 - `onnxruntime` not in OSS-Fuzz (404), but its format-load path overlaps the already-fuzzed onnx protobuf parser; marginal open ground is narrow. Not selected.
+
+## transformers config parsing [selected target, robustness scope]
+
+- transformers not in OSS-Fuzz (404; sentencepiece control 200); repo ships no fuzz targets.
+- Config CODE-EXECUTION surface heavily worked (CVE-2026-4372 _attn_implementation_internal, CVE-2026-5241 auto_map/trust_remote_code, CVE-2026-1839 Trainer torch.load). Config-PARSING robustness surface not separately fuzzed.
+- Scope limited to robustness/DoS (crashes/hangs in dict-to-object parsing). Code-exec fields stripped from every input by a scope guard; trust_remote_code never set. Entry point PretrainedConfig.from_dict verified (configuration_utils.py:861), confirmed inert re remote code.
+- Validated in-sandbox against transformers 5.15.0: self-test passes, 60s campaign clean with coverage growth.

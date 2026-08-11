@@ -1,31 +1,95 @@
 name: continuous-fuzz
 
-# Short fuzzing on every push / PR, plus a nightly longer run. Each target builds
-# its harness, runs a time-boxed campaign, and pipes any crash reports through
-# chassis/triage. The job fails if triage finds a 'real' bucket, so a genuine new
-# crash blocks the merge; shallow blockers and review-class faults do not.
-#
-# This is the ClusterFuzzLite-style "continuous" layer. GGUF runs here because
-# its blockers are public. The tokenizers and pytorch targets are listed but
-# gated off by default: their findings/blockers are embargoed, so enabling them
-# in a public CI would disclose. Enable per-target once a finding is reported.
+# Continuous fuzzing: short campaigns on push/PR, longer nightly. Each target
+# builds its harness, runs a time-boxed campaign, and pipes any crash reports
+# through chassis/triage. Triage exits non-zero only when it classifies a fault
+# as 'real', so a genuine new crash fails the job (gate); shallow and review
+# faults do not. Embargoed targets (tokenizers, pytorch findings/blockers) are
+# NOT run in public CI, to avoid disclosure.
 
 on:
   push:
     branches: [main]
   pull_request:
   schedule:
-    - cron: "0 3 * * *"   # nightly longer run
+    - cron: "0 3 * * *"
+  workflow_dispatch:        # allow manual runs for shakeout
 
 jobs:
-  gguf:
+  # Fast, dependency-light job that proves the fuzz -> triage -> gate loop runs
+  # end to end WITHOUT a heavy native build. Uses the transformers config
+  # robustness harness (pure Python, no torch). This is the job that should go
+  # green first on a real runner.
+  triage-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Triage unit tests
+        run: python3 chassis/tests/test_triage.py
+      - name: Triage gate semantics (must exit 1 on a 'real' bucket)
+        run: |
+          set +e
+          python3 -m chassis.triage chassis/tests/fixtures/ >/dev/null 2>&1
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "FAIL: expected exit 1 (real bucket present), got $code"; exit 1
+          fi
+          echo "OK: triage gate trips on a real finding (exit 1)"
+
+  config-fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install harness deps
+        run: python3 -m pip install --quiet transformers atheris
+      - name: Self-test the harness
+        working-directory: targets/transformers_config
+        run: python3 harness/fuzz_config_from_dict.py --selftest
+      - name: Fuzz (short on PR, longer nightly)
+        working-directory: targets/transformers_config
+        run: |
+          DUR=60
+          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=900; fi
+          mkdir -p artifacts
+          python3 harness/fuzz_config_from_dict.py \
+            -max_total_time=$DUR -rss_limit_mb=4096 -artifact_prefix=artifacts/ || true
+      - name: Triage any crashes (gate on 'real')
+        run: |
+          mkdir -p reports
+          shopt -s nullglob
+          for f in targets/transformers_config/artifacts/crash-*; do
+            python3 targets/transformers_config/harness/fuzz_config_from_dict.py "$f" \
+              2>"reports/$(basename "$f").txt" || true
+          done
+          # triage exits 1 if a real bucket exists -> fails the job
+          python3 -m chassis.triage reports/
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-fuzz-artifacts
+          path: targets/transformers_config/artifacts/
+          if-no-files-found: ignore
+
+  # Heavy native fuzzing. GGUF clones and builds llama.cpp at a pinned commit;
+  # runs only its public fuzz-blockers. Allowed to be slower/flakier than the
+  # Python jobs; does not block them.
+  gguf-fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
-      - name: Build GGUF harness (with public fuzz-blockers)
+      - name: Build GGUF harness (public fuzz-blockers applied)
         working-directory: targets/gguf
         run: APPLY_FUZZ_BLOCKERS=1 ./build.sh
       - name: Fuzz (short on PR, longer nightly)
@@ -33,13 +97,15 @@ jobs:
         run: |
           DUR=120
           if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1800; fi
-          mkdir -p corpus_run && cp corpus/seed_minimal.gguf corpus_run/ || true
-          ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 -artifact_prefix=artifacts/ corpus_run/ 2>run.log || true
-      - name: Triage crashes
+          mkdir -p corpus_run artifacts
+          cp corpus/seed_minimal.gguf corpus_run/ 2>/dev/null || true
+          ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 \
+            -artifact_prefix=artifacts/ corpus_run/ 2>run.log || true
+      - name: Triage any crashes (gate on 'real')
         run: |
           mkdir -p reports
+          shopt -s nullglob
           for f in targets/gguf/artifacts/crash-* targets/gguf/artifacts/timeout-*; do
-            [ -e "$f" ] || continue
             targets/gguf/fuzz_gguf "$f" 2>"reports/$(basename "$f").txt" || true
           done
           python3 -m chassis.triage reports/
@@ -52,10 +118,3 @@ jobs:
             targets/gguf/artifacts/
             targets/gguf/run.log
           if-no-files-found: ignore
-
-  triage-selftest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Triage unit tests
-        run: python3 chassis/tests/test_triage.py

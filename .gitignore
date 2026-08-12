@@ -30,3 +30,7 @@ targets/*/.tokenizers-src/
 # python bytecode
 __pycache__/
 *.pyc
+
+# continuous-fuzz working corpus (accumulated, cached in CI, not committed)
+targets/*/corpus_run/
+targets/*/corpus_min/

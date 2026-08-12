@@ -50,17 +50,31 @@ jobs:
           python-version: "3.12"
       - name: Install harness deps
         run: python3 -m pip install --quiet transformers atheris
+      - name: Restore accumulated corpus
+        uses: actions/cache@v4
+        with:
+          path: targets/transformers_config/corpus_run
+          key: corpus-config-${{ github.run_id }}
+          restore-keys: corpus-config-
       - name: Self-test the harness
         working-directory: targets/transformers_config
         run: python3 harness/fuzz_config_from_dict.py --selftest
-      - name: Fuzz (short on PR, longer nightly)
+      - name: Fuzz (accumulate into persistent corpus)
         working-directory: targets/transformers_config
         run: |
           DUR=60
           if [ "${{ github.event_name }}" = "schedule" ]; then DUR=900; fi
-          mkdir -p artifacts
+          mkdir -p corpus_run artifacts
+          bash ../../chassis/corpus.sh seed corpus_run corpus || true
           python3 harness/fuzz_config_from_dict.py \
-            -max_total_time=$DUR -rss_limit_mb=4096 -artifact_prefix=artifacts/ || true
+            -max_total_time=$DUR -rss_limit_mb=4096 \
+            -artifact_prefix=artifacts/ corpus_run/ || true
+      - name: Minimize corpus before caching
+        working-directory: targets/transformers_config
+        run: |
+          bash ../../chassis/corpus.sh minimize \
+            "python3 harness/fuzz_config_from_dict.py" corpus_min corpus_run || true
+          rm -rf corpus_run && mv corpus_min corpus_run 2>/dev/null || true
       - name: Triage any crashes (gate on 'real')
         run: |
           mkdir -p reports
@@ -89,18 +103,29 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+      - name: Restore accumulated corpus
+        uses: actions/cache@v4
+        with:
+          path: targets/gguf/corpus_run
+          key: corpus-gguf-${{ github.run_id }}
+          restore-keys: corpus-gguf-
       - name: Build GGUF harness (public fuzz-blockers applied)
         working-directory: targets/gguf
         run: APPLY_FUZZ_BLOCKERS=1 ./build.sh
-      - name: Fuzz (short on PR, longer nightly)
+      - name: Fuzz (accumulate into persistent corpus)
         working-directory: targets/gguf
         run: |
           DUR=120
           if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1800; fi
           mkdir -p corpus_run artifacts
-          cp corpus/seed_minimal.gguf corpus_run/ 2>/dev/null || true
+          bash ../../chassis/corpus.sh seed corpus_run corpus || true
           ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 \
             -artifact_prefix=artifacts/ corpus_run/ 2>run.log || true
+      - name: Minimize corpus before caching
+        working-directory: targets/gguf
+        run: |
+          bash ../../chassis/corpus.sh minimize ./fuzz_gguf corpus_min corpus_run || true
+          rm -rf corpus_run && mv corpus_min corpus_run 2>/dev/null || true
       - name: Triage any crashes (gate on 'real')
         run: |
           mkdir -p reports

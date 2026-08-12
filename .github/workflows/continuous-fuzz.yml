@@ -40,6 +40,58 @@ jobs:
           fi
           echo "OK: triage gate trips on a real finding (exit 1)"
 
+  # Resource-exhaustion oracle regression guard. Pure stdlib, fast. Asserts the
+  # oracle still flags a declared-huge bomb and passes a benign loader (and does
+  # so safely, in a capped child, without OOM-ing the runner).
+  resource-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Resource oracle self-test
+        run: python3 chassis/resource_oracle.py --selftest
+
+  # Cross-implementation differential oracle. Verifies the fast/slow invariant
+  # still holds (a broken invariant would make divergence findings untrustworthy)
+  # and runs a short divergence campaign. A divergence would fail the job.
+  differential-fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install harness deps
+        run: python3 -m pip install --quiet transformers atheris
+      - name: Invariant self-test (fast==slow must hold)
+        working-directory: targets/tokenizers_differential
+        run: python3 harness/fuzz_fast_slow_divergence.py --selftest
+      - name: Divergence campaign (a divergence fails the job)
+        working-directory: targets/tokenizers_differential
+        run: |
+          DUR=60
+          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=600; fi
+          mkdir -p artifacts
+          python3 harness/fuzz_fast_slow_divergence.py \
+            -max_total_time=$DUR -rss_limit_mb=2048 -artifact_prefix=artifacts/ || true
+          # a divergence writes a crash-* artifact; fail the job if any exist
+          shopt -s nullglob
+          found=(artifacts/crash-*)
+          if [ ${#found[@]} -gt 0 ]; then
+            echo "DIVERGENCE FOUND: ${found[*]}"; exit 1
+          fi
+          echo "no divergence (fast/slow agree)"
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: differential-artifacts
+          path: targets/tokenizers_differential/artifacts/
+          if-no-files-found: ignore
+
   config-fuzz:
     runs-on: ubuntu-latest
     timeout-minutes: 20

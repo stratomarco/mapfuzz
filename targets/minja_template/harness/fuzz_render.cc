@@ -17,27 +17,16 @@
 #include <string>
 #include <cstdint>
 #include <cstddef>
-#include <csignal>
-#include <csetjmp>
 
 #include "minja/minja.hpp"
 
 using json = nlohmann::ordered_json;
 
-// Neutralize the known integer div/mod-by-zero (a SIGFPE crash) so a long
-// campaign explores OTHER interpreter bugs instead of re-finding it. A SIGFPE
-// handler longjmps back and the input is skipped. Static detection of "divide by
-// zero" from raw template bytes is impractical, so we trap the signal instead.
-// Remove once minja guards its integer operators.
-static sigjmp_buf g_fpe_env;
-static volatile sig_atomic_t g_fpe_armed = 0;
-static void fpe_handler(int) {
-  if (g_fpe_armed) {
-    g_fpe_armed = 0;
-    siglongjmp(g_fpe_env, 1);
-  }
-  _Exit(136);  // unexpected SIGFPE outside the guarded region
-}
+// Note on the known integer div/mod-by-zero: build.sh compiles this harness with
+// -fsanitize-recover=integer-divide-by-zero,float-divide-by-zero, so UBSan logs
+// that one check and continues rather than aborting, letting the campaign explore
+// past it. No signal handler is used (it conflicted with libFuzzer's own signal
+// setup); the recover flag alone is sufficient under the UBSan build we fuzz with.
 
 // Build a realistic chat context once (messages, tools, common variables that
 // real chat templates reference), so rendering reaches template logic instead of
@@ -80,10 +69,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   std::string tmpl(reinterpret_cast<const char *>(data), size);
 
-  // Install the SIGFPE handler once.
-  static bool installed = [](){ signal(SIGFPE, fpe_handler); return true; }();
-  (void)installed;
-
   try {
     minja::Options opts;
     opts.trim_blocks = false;
@@ -94,21 +79,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (!node) return 0;
 
     auto ctx = minja::Context::make(make_chat_context());
-
-    // Guard render against the known integer div/mod-by-zero SIGFPE (finding
-    // handled separately). If it fires, skip this input and continue fuzzing.
-    if (sigsetjmp(g_fpe_env, 1) != 0) {
-      return 0;
-    }
-    g_fpe_armed = 1;
     std::string out = node->render(ctx);   // the interpreter surface
-    g_fpe_armed = 0;
     (void)out.size();
   } catch (const std::runtime_error &) {
-    g_fpe_armed = 0;
     // Expected: malformed template / bad operation.
   } catch (const std::exception &) {
-    g_fpe_armed = 0;
     // Other std exceptions are clean rejections for this harness.
   }
   return 0;

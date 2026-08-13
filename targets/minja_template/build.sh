@@ -9,7 +9,9 @@ mkdir -p "$DEPS/minja" "$DEPS/nlohmann"
 [ -f "$DEPS/minja/minja.hpp" ] || curl -fsSL "https://raw.githubusercontent.com/google/minja/main/include/minja/minja.hpp" -o "$DEPS/minja/minja.hpp"
 [ -f "$DEPS/nlohmann/json.hpp" ] || curl -fsSL "https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp" -o "$DEPS/nlohmann/json.hpp"
 FLAGS="-std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all -I$DEPS"
-clang++ $FLAGS harness/fuzz_parse.cc  -o fuzz_parse
-clang++ $FLAGS harness/fuzz_render.cc -o fuzz_render
+clang++ $FLAGS harness/fuzz_parse.cc -o fuzz_parse
+# render: recover from div-by-zero so the campaign explores past that known bug
+# (all other checks stay fatal). parse does no arithmetic so keeps strict flags.
+clang++ $FLAGS -fsanitize-recover=integer-divide-by-zero,float-divide-by-zero harness/fuzz_render.cc -o fuzz_render
 echo "built: fuzz_parse (parser), fuzz_render (interpreter)"
 echo "run: ./fuzz_render -max_total_time=3600 -rss_limit_mb=4096 corpus/"

@@ -43,3 +43,25 @@ defenses hold; malformed shape/dtype/buffer reject cleanly). Coverage was flat
 (cov 33), the array work is in numpy C code with weak coverage signal, so this is
 a somewhat shallow negative. The `from_state_dict` structural-matching layer
 (flax's own Python, richer coverage) is the more promising next harness.
+
+## Second harness: fuzz_from_state_dict.py (structural layer)
+
+Fuzzes flax.serialization.from_state_dict(target, state), the structural
+reconciliation of an untrusted state against a target template. Richer coverage
+than the array path (flax's own Python recursion, not numpy C code).
+
+Result: one low-severity ROBUSTNESS observation, NOT a security finding. When the
+state's type does not match the target (e.g. a non-dict where a dict is expected),
+flax calls .keys() without a type check and raises a raw AttributeError
+("'X' object has no attribute 'keys'") instead of its own SerializationError /
+ValueError. All ~147 initially-flagged cases dedup to this SINGLE root cause
+(different input types, same code path). Across 200k additional inputs filtering
+this soft-spot, no other fault appeared: no recursion, no crash.
+
+Assessment: this is a code-quality gap (wrong exception type / less helpful
+message), not a vulnerability. The program does not crash and a caller's exception
+handler still catches it. Distinct from 0002/0003, which were process-aborting
+panics. Worth at most a small upstream PR adding a type check; NOT filed as a
+security finding. Recorded here for completeness and to avoid re-discovering it.
+
+The from_state_dict reconciliation logic is otherwise robust.

@@ -52,3 +52,51 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 - Config CODE-EXECUTION surface heavily worked (CVE-2026-4372 _attn_implementation_internal, CVE-2026-5241 auto_map/trust_remote_code, CVE-2026-1839 Trainer torch.load). Config-PARSING robustness surface not separately fuzzed.
 - Scope limited to robustness/DoS (crashes/hangs in dict-to-object parsing). Code-exec fields stripped from every input by a scope guard; trust_remote_code never set. Entry point PretrainedConfig.from_dict verified (configuration_utils.py:861), confirmed inert re remote code.
 - Validated in-sandbox against transformers 5.15.0: self-test passes, 60s campaign clean with coverage growth.
+
+## numpy .npy/.npz [RULED OUT - already fuzzed]
+
+- numpy IS in OSS-Fuzz (project.yaml present, vendor AdaLogics). Definitive check
+  of projects/numpy/ shows harnesses that cover our exact intended surface:
+  fuzz_binary_loader.py (imports zipfile+tempfile = .npy/.npz load path),
+  fuzz_fromfile_loader.py, fuzz_dtype.py (dtype descriptor parsing), fuzz_loader.py.
+- The .npy/.npz format parser and the dtype-string surface are continuously
+  fuzzed. RULED OUT, same as safetensors and ONNX. Do not build.
+
+## HDF5 / Keras / h5py [RULED OUT - already fuzzed, including the RCE surface]
+
+- hdf5, h5py, keras, tensorflow ALL in OSS-Fuzz (all project.yaml 200).
+- keras fuzzes the exact promising surfaces: fuzz_model.py (h5py + keras .h5
+  model load) AND fuzz_serialization.py (deserialize_keras_object = the config
+  deserialization / RCE surface). h5py fuzzes the HDF5 file layer (h5f).
+- Both the binary format and the model-deserialization path are covered. RULED OUT.
+
+## Strategic note: mainstream ML formats are saturated in OSS-Fuzz
+
+Audit finding across this session: numpy, hdf5, h5py, keras, tensorflow, onnx,
+safetensors, sentencepiece are ALL in OSS-Fuzz (largely via AdaLogics). The
+obvious format-parser targets are taken. mapfuzz's defensible niche is therefore
+NOT "fuzz another mainstream format parser" but the surfaces OSS-Fuzz does not
+cover: (1) newer/smaller-ecosystem loaders not yet onboarded (llama.cpp GGUF was
+one; tokenizers Rust internals were another - both yielded); (2) cross-cutting
+bug CLASSES that per-project fuzzers miss (resource exhaustion / decompression
+bombs, cross-implementation divergence, the download-to-load trust-boundary
+composition); (3) the integration layer where a model file crosses between a
+parser and a consumer. Breadth-by-format is largely exhausted; depth-by-class and
+newer-loaders are where the open ground is.
+
+## flax/orbax JAX checkpoint restore [SELECTED - open]
+
+- flax, orbax, jax, msgpack all NOT in OSS-Fuzz (404; pyyaml/sentencepiece 200 controls).
+  The raw YAML/sentencepiece parse layers are covered; the JAX checkpoint-restore
+  path is not.
+- Entry point verified: flax.serialization.msgpack_restore(bytes) -> pytree (and
+  from_bytes -> from_state_dict). Custom ext_hook (_msgpack_ext_unpack) and
+  _ndarray_from_bytes (np.frombuffer + reshape on untrusted shape/dtype/buffer)
+  are flax's own deserialization logic, distinct from raw msgpack.
+- Trust boundary: restoring an untrusted JAX/flax checkpoint (download-to-load),
+  the JAX-ecosystem sibling of the pytorch weights_only target. Used by DreamerV3
+  and most JAX world models (dreamerv3/lerobot also 404, not fuzzed).
+- Shallow probes: array reconstruction mostly robust (shape/buffer mismatch, huge
+  shape, object-dtype all reject cleanly), but shape/dtype fields are loosely
+  typed (string shapes interpreted byte-wise, exotic dtypes pass). A structure-
+  aware fuzzer is warranted. Validated in-sandbox (flax 0.12.8 installed).

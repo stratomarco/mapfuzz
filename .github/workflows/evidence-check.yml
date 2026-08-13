@@ -1,0 +1,29 @@
+name: evidence-base
+on:
+  push:
+    paths: ["evidence/**"]
+  pull_request:
+    paths: ["evidence/**"]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+      - name: Validate claims.yaml
+        run: python3 evidence/tool.py --check
+      - name: Check claims.md is in sync with claims.yaml
+        run: |
+          python3 evidence/tool.py --render
+          if ! git diff --quiet evidence/claims.md; then
+            echo "claims.md is out of sync with claims.yaml. Run: python3 evidence/tool.py --render"
+            git diff evidence/claims.md
+            exit 1
+          fi
+          echo "claims.md is in sync"

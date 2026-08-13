@@ -1,0 +1,476 @@
+# mapfuzz Research Evidence Base - canonical claims
+# Deterministic, human-auditable. See schema.md for field definitions.
+# Machine-parseable YAML; a RAG layer may index this but must not replace it.
+
+claims:
+
+# ============================ FINDINGS ============================
+
+- id: C-0001
+  date: 2026-08-13
+  target: tokenizers
+  entry_point: Tokenizer::from_str / from_bytes
+  statement: >
+    A malformed decoder field causes a panic (process abort) at
+    decoders/mod.rs:90 via .expect() on an untrusted deserialize (finding 0002).
+  kind: finding
+  confidence: verified
+  provenance:
+    - source-read:tokenizers/src/decoders/mod.rs:90
+    - sandbox-run:cargo-fuzz + Atheris harness, minimized 23-byte reproducer
+  observation: >
+    23-byte input {"decoder":<malformed>} triggers PanicException at
+    decoders/mod.rs:90. DecoderHelper::deserialize(...).expect("Helper").
+  boundary: >
+    DoS only (panic on load); safe Rust, no memory-safety or code-execution
+    impact. Establishes one site, not the full class (see C-0002, C-0004).
+  severity: low
+  status: reported
+  refs: [PRIVATE_findings/0002-0003-DISCLOSURE-REPORT.md]
+
+- id: C-0002
+  date: 2026-08-13
+  target: tokenizers
+  entry_point: Tokenizer::from_str
+  statement: >
+    A Precompiled normalizer with missing OR malformed precompiled_charsmap
+    panics at normalizers/mod.rs:143 via .expect() (finding 0003).
+  kind: finding
+  confidence: verified
+  provenance:
+    - source-read:tokenizers/src/normalizers/mod.rs:143
+    - sandbox-run:coverage-guided structure-stable generator
+    - machine-run:reproduced on crates 0.21.4, 0.22.2, and 0.23.1
+  observation: >
+    {"type":"Precompiled"} normalizer panics: Precompiled Error("missing field
+    precompiled_charsmap"). Correct pattern commented out one line above (142);
+    adjacent Replace arm (146) uses map_err(serde::de::Error::custom)?.
+  boundary: >
+    DoS only. Same class as C-0001. Reproduced across three released versions
+    (strengthens generality). Does not establish reachability in any specific
+    downstream application.
+  severity: low
+  status: reported
+  refs: [PRIVATE_findings/0002-0003-DISCLOSURE-REPORT.md]
+
+- id: C-0003
+  date: 2026-08-13
+  target: tokenizers
+  statement: >
+    The .expect-on-untrusted-deserialize panic class is bounded to exactly two
+    tokenizer components: normalizers and decoders.
+  kind: finding
+  confidence: verified
+  provenance:
+    - sandbox-run:probed 12 pre_tokenizer + 5 post_processor variants + models
+    - claim:C-0001
+    - claim:C-0002
+  observation: >
+    All 20 pre_tokenizer/post_processor variants and models reject malformed
+    input cleanly (normal Exception, no PanicException) across 20+ fielded probes.
+    normalizers/mod.rs:101 and :104 verified NOT reachable (reject cleanly).
+  boundary: >
+    Bounds the panic class to two components; does not prove the entire codebase
+    is otherwise panic-free under all inputs, only the component-construction
+    surface probed.
+  severity: low
+  status: reported
+  refs: [PRIVATE_findings/0002-0003-DISCLOSURE-REPORT.md]
+
+- id: C-0010
+  date: 2026-08-13
+  target: minja
+  entry_point: Parser::parse
+  statement: >
+    minja's recursive-descent expression parser has no depth limit; deeply
+    nested expressions exhaust the stack and crash (SIGSEGV) at parse time
+    (finding 0004).
+  kind: finding
+  confidence: verified
+  provenance:
+    - source-read:minja.hpp (no depth/recursion guard in parseExpression chain)
+    - machine-run:libFuzzer+ASan crash; deterministic PoC ~2000 nesting levels
+    - machine-run:stack-size test (ulimit -s 65536 -> no crash) confirms depth-driven
+  observation: >
+    ASan stack-overflow; trace cycles parseExpression..parseBracedExpressionOrArray.
+    Does not crash ~400 levels at 8MB stack; reliably crashes ~2000. Raising stack
+    stops a given input crashing (depth-driven, not fixed-offset).
+  boundary: >
+    DoS via stack exhaustion; SIGSEGV is not a controllable write, no
+    code-execution claim. Threshold is stack-size dependent, not a fixed count.
+  severity: medium-low
+  status: embargoed
+  refs: [PRIVATE_findings/0004-minja-parser-recursion-dos.md]
+
+- id: C-0011
+  date: 2026-08-13
+  target: minja
+  entry_point: render (expression evaluation)
+  statement: >
+    minja performs integer division and modulo with no zero-divisor check at
+    multiple sites; a zero divisor crashes the process with SIGFPE (finding 0005).
+  kind: finding
+  confidence: verified
+  provenance:
+    - source-read:minja.hpp BinaryOpExpr switch Op::Div/DivDiv/Mod ~1372-1375
+    - source-read:minja.hpp Value::operator/ ~503 and operator% ~508
+    - machine-run:libFuzzer render campaign, {{ 1/0 }} and {{ 57%0 }}
+    - machine-run:NON-sanitized -O2 build, exit 136 (SIGFPE), not sanitizer-only
+  observation: >
+    {{ 1/0 }}, {{ 57%0 }}, {{ 5//0 }} all -> "Floating point exception" exit 136
+    in a non-sanitized -O2 build. Controls {{ 10%3 }}->1, {{ 5/2 }}->2 OK. Five
+    unguarded integer div/mod sites across two implementations.
+  boundary: >
+    DoS via SIGFPE; not memory corruption, no code-execution claim. Scope
+    corrected to multiple sites after a deeper campaign (see C-0012).
+  severity: medium-low
+  status: embargoed
+  refs: [PRIVATE_findings/0005-minja-division-by-zero.md]
+
+- id: C-0012
+  date: 2026-08-13
+  target: minja
+  statement: >
+    Finding 0005's true scope is five integer div/mod sites, not the two
+    originally documented; a deeper campaign surfaced the BinaryOpExpr switch
+    sites (Op::Div/DivDiv/Mod) in addition to the Value operators.
+  kind: correction
+  confidence: verified
+  provenance:
+    - machine-run:render campaign hit minja.hpp:1375 (Op::Mod) via {{ 57%0 }}
+    - source-read:BinaryOpExpr::do_evaluate switch lines ~1372-1375
+    - claim:C-0011
+  observation: >
+    Original 0005 writeup listed operator/ (503) and operator% (508). The deeper
+    campaign FPE'd at 1375 inside BinaryOpExpr::do_evaluate, a second independent
+    modulo implementation. Non-sanitized test confirmed real SIGFPE.
+  boundary: >
+    Corrects scope of C-0011; does not add a new finding (same class, same crash).
+    Matters for fix completeness (a partial fix of only the Value operators would
+    leave the switch sites crashing).
+  status: embargoed
+  refs: [PRIVATE_findings/0005-minja-division-by-zero.md]
+
+# ========================= NON-FINDINGS (calibration) =========================
+
+- id: C-0020
+  date: 2026-08-13
+  target: flax_checkpoint
+  entry_point: from_state_dict
+  statement: >
+    from_state_dict raises a raw AttributeError (not flax's SerializationError)
+    when the state's type does not match the target; a robustness nit, NOT a
+    security finding.
+  kind: non-finding
+  confidence: verified
+  provenance:
+    - sandbox-run:200k inputs, all ~147 flagged cases dedup to one .keys() site
+    - source-read:from_state_dict dict handler calls .keys() without type check
+  observation: >
+    Type-mismatched state -> AttributeError "'X' object has no attribute 'keys'".
+    All flagged cases (float/None/bytes/str/bool/list/int) are one root cause.
+    200k further inputs found no other fault.
+  boundary: >
+    NOT counted as a finding: program does not crash, a caller's except still
+    catches it, wrong exception type only. Worth at most a one-line upstream PR.
+  severity: none
+  status: active
+  refs: [targets/flax_checkpoint/README.md]
+
+- id: C-0021
+  date: 2026-08-13
+  target: minja
+  statement: >
+    minja's integer arithmetic (operator*, and inf->long via json cast) invokes
+    UB on extreme operands but does NOT crash a release build; not a finding.
+  kind: non-finding
+  confidence: verified
+  provenance:
+    - machine-run:non-sanitized -O2, signed overflow wraps (INT64_MAX*2 -> -2)
+    - machine-run:non-sanitized -O2, 55555555**54 renders null, %-form renders -3908
+    - source-read:minja.hpp:497 operator* ; nlohmann/json.hpp:5324 float cast
+  observation: >
+    UBSan flagged signed-integer-overflow at minja.hpp:497 and inf-out-of-range
+    at json.hpp:5324. Non-sanitized build wraps/garbage-renders and exits 0. No
+    crash.
+  boundary: >
+    NOT counted: UBSan-only, defined-in-practice on x86, no crash in release. A
+    correctness/robustness observation (arithmetic does no range checking), not a
+    DoS. Only the div/mod-by-zero cases (C-0011) actually crash.
+  severity: none
+  status: active
+  refs: [PRIVATE_findings/minja-0004-0005-DISCLOSURE-REPORT.md]
+
+# ============================= NEGATIVES (robust surfaces) =========================
+
+- id: C-0030
+  date: 2026-08-13
+  target: pytorch
+  entry_point: torch._weights_only_unpickler.load
+  statement: >
+    The weights_only unpickler is robust across blind, structure-aware, and
+    coverage-stable fuzzing; no defect found.
+  kind: negative
+  confidence: verified
+  provenance:
+    - machine-run:fuzz_weights_only blind, 6M runs clean
+    - machine-run:fuzz_rebuild_args structure-aware meta-tensor, 13M runs clean
+    - machine-run:fuzz_rebuild_args_stable coverage-stable, same cov:57 corridor
+  observation: >
+    Three independent harnesses, 6M+13M+ runs, all clean. Restricted unpickler
+    needs LEGACY GLOBAL opcode not STACK_GLOBAL; persistent_load must return a
+    TYPED storage. Coverage ceiling cov:57 (shallow corridor).
+  boundary: >
+    Robust on the reachable weights_only surface at stated effort. Does NOT cover
+    the full torch.load (non-weights_only) surface, nor container zip-surgery
+    beyond what was tested (CVE-2026-24747 defended on the tested machine).
+  status: active
+  refs: [targets/pytorch/]
+
+- id: C-0031
+  date: 2026-08-13
+  target: transformers_config
+  entry_point: PretrainedConfig.from_dict
+  statement: >
+    PretrainedConfig.from_dict is robust over a 487k-run campaign; no defect
+    found (with code-exec keys deliberately scoped out).
+  kind: negative
+  confidence: verified
+  provenance:
+    - machine-run:Atheris campaign 487k runs clean
+    - source-read:configuration_utils.py:861 entry point verified
+  observation: >
+    Clean over 487k runs. Scope guard strips code-exec keys (auto_map,
+    trust_remote_code, etc.), deliberately avoiding the config-RCE surface
+    (CVE-2026-4372/5241/1839).
+  boundary: >
+    Robust on the non-code-exec config-parse surface. Deliberately does NOT test
+    the config-RCE surface (out of scope by design). Not a statement about the
+    RCE keys.
+  status: active
+  refs: [targets/transformers_config/]
+
+- id: C-0032
+  date: 2026-08-13
+  target: flax_checkpoint
+  entry_point: msgpack_restore
+  statement: >
+    flax msgpack_restore array-reconstruction is robust; malformed
+    shape/dtype/buffer reject cleanly.
+  kind: negative
+  confidence: verified
+  provenance:
+    - machine-run:23.4M runs clean (WSL)
+    - sandbox-run:~480k runs clean
+    - source-read:_ndarray_from_bytes np.frombuffer+reshape on untrusted triple
+  observation: >
+    23.4M runs no crash. Malformed shape/buffer mismatch, huge shape, object
+    dtype all reject cleanly (numpy frombuffer defenses hold). Coverage flat
+    (cov:33), numpy-C blind spot.
+  boundary: >
+    Robust but a SHALLOW negative: coverage flat because array work is in numpy
+    C code with weak coverage feedback. Does not deeply exercise flax's own logic
+    (the from_state_dict path C-0020 covers that).
+  status: active
+  refs: [targets/flax_checkpoint/]
+
+- id: C-0033
+  date: 2026-08-13
+  target: tokenizers_differential
+  statement: >
+    BERT fast (Rust) vs slow (Python) tokenizers agree across historically
+    divergent Unicode categories; no supply-chain divergence found.
+  kind: negative
+  confidence: verified
+  provenance:
+    - machine-run:differential oracle, invariant holds 15/15
+    - sandbox-run:13 historically-divergent Unicode categories, no divergence
+  observation: >
+    fast==slow held across all probes. Byte-level BPE (GPT2) pairing
+    INCONCLUSIVE offline (could not build a valid divergent baseline without
+    network fetch).
+  boundary: >
+    Fast/slow well-reconciled at reachable BERT surfaces. GPT2 byte-level pairing
+    is inconclusive, NOT confirmed robust. Does not cover all tokenizer families.
+  status: active
+  refs: [targets/tokenizers_differential/]
+
+- id: C-0034
+  date: 2026-08-13
+  target: gguf
+  entry_point: gguf_init_from_buffer
+  statement: >
+    Current llama.cpp GGUF is hardened against resource-exhaustion (declared-huge)
+    inputs; bounds and overflow guards are present.
+  kind: negative
+  confidence: verified
+  provenance:
+    - source-read:gguf.cpp nbytes_remain checks (269/285/292/349/358)
+    - source-read:gguf.cpp n_tensors/n_kv bounds vs SIZE_MAX/sizeof (13/24)
+    - source-read:gguf.cpp dimension-product overflow guard (685-687)
+    - machine-run:58M runs clean after 5-hunk fuzz-blocker patch
+  observation: >
+    Declared sizes checked vs remaining file bytes; n_tensors/n_kv bounded;
+    dimension product overflow-guarded. 58M runs clean with blockers applied.
+  boundary: >
+    Hardened against the declared-huge/resource-exhaustion class specifically.
+    The 5 known bugs it reproduced are pre-existing/duplicate, not new findings.
+  status: active
+  refs: [targets/gguf/, chassis/resource_oracle.py]
+
+# ============================= AUDITS (M0 / scope) =========================
+
+- id: C-0040
+  date: 2026-08-13
+  target: project
+  statement: >
+    Mainstream ML format parsers are saturated in OSS-Fuzz; mapfuzz's open ground
+    is newer/smaller loaders and cross-cutting bug classes.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read:OSS-Fuzz project.yaml present for numpy/hdf5/h5py/keras/tf/onnx/safetensors/sentencepiece
+    - source-read:numpy fuzz_binary_loader (.npy/.npz), keras fuzz_serialization (deserialize_keras_object RCE surface)
+  observation: >
+    All mainstream format libs in OSS-Fuzz, including the juicy surfaces (numpy
+    .npy/dtype, keras deserialize RCE, HDF5 file layer). GGUF/tokenizers-Rust/
+    flax/minja/orbax/jax/msgpack/dreamerv3/lerobot all ABSENT (404).
+  boundary: >
+    "Saturated" means those specific surfaces are continuously fuzzed by others;
+    does not mean they are bug-free, only that re-fuzzing duplicates professional
+    work. Open-ground list is as of this date; OSS-Fuzz onboards over time.
+  status: active
+  refs: [docs/M0-baseline-audit.md]
+
+- id: C-0041
+  date: 2026-08-13
+  target: minja
+  statement: >
+    minja (llama.cpp's C++ chat-template engine) is unfuzzed and is a real
+    download-to-load-to-execute trust boundary.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read:OSS-Fuzz jinja2 present (200) but minja/consumers absent (404)
+    - source-read:no fuzzer in google/minja repo
+    - source-read:chat templates ship in tokenizer_config and are parsed+rendered by llama.cpp
+  observation: >
+    jinja2 (Python) fuzzed; minja (C++ reimpl) and consumers (llama-cpp-python,
+    ollama, vllm, transformers) all 404. Header-only, ~3077 lines.
+  boundary: >
+    Establishes the target is open and the boundary is real. Yielded two findings
+    (C-0010, C-0011). Does not establish the interpreter is memory-unsafe (see
+    the ongoing render campaign).
+  status: active
+  refs: [docs/M0-baseline-audit.md, targets/minja_template/]
+
+# ============================= METHODS (lessons) =========================
+
+- id: C-0050
+  date: 2026-08-13
+  target: project
+  statement: >
+    Structure-STABLE encoding (fixed-layout byte decode so one flipped byte
+    changes one field) turns libFuzzer byte mutations into structural mutations,
+    but only pays off on a rich surface.
+  kind: method
+  confidence: verified
+  provenance:
+    - claim:C-0002
+    - machine-run:found 0003 fast on tokenizer.json (rich); no gain on pytorch corridor
+  observation: >
+    tokenizer.json (branchy) yielded 0003 quickly under the stable generator;
+    the pytorch meta-tensor path (cov ceiling 57) showed no gain.
+  boundary: >
+    Effective only where the target surface is rich/branchy. On shallow corridors
+    or native-C surfaces (weak coverage feedback) it does not help.
+  status: active
+  refs: [docs/LESSONS.md]
+
+- id: C-0051
+  date: 2026-08-13
+  target: project
+  statement: >
+    Dedup crashes by fault LOCATION, not artifact count; many artifacts routinely
+    collapse to one root cause.
+  kind: method
+  confidence: verified
+  provenance:
+    - claim:C-0020
+    - machine-run:GGUF 14,724 artifacts = 1 bug; flax ~147 flagged = 1 .keys() site
+  observation: >
+    14,724 GGUF artifacts deduped to one div-by-zero; 147 flax from_state_dict
+    flags to one .keys() site.
+  boundary: >
+    Location-dedup is necessary for honest counting; it does not by itself judge
+    severity (a location can be benign UB, see C-0021).
+  status: active
+  refs: [chassis/triage.py, docs/LESSONS.md]
+
+- id: C-0052
+  date: 2026-08-13
+  target: project
+  statement: >
+    A UBSan flag is not a finding until confirmed to crash a non-sanitized
+    release build; several UBSan hits are defined-in-practice and do not crash.
+  kind: method
+  confidence: verified
+  provenance:
+    - claim:C-0021
+    - machine-run:signed-overflow and inf->long wrap/garbage in -O2, exit 0
+    - machine-run:div/mod-by-zero DO crash -O2 (SIGFPE exit 136), so ARE findings
+  observation: >
+    Same campaign: signed-overflow and float-cast UBSan hits render values and
+    exit 0 (non-findings); div/mod-by-zero UBSan hits crash with SIGFPE
+    (findings). The non-sanitized test is the discriminator.
+  boundary: >
+    Distinguishes real crashes from benign UB. Does not address bugs that are
+    memory-unsafe only under specific allocators/platforms; ASan is the check for
+    those.
+  status: active
+  refs: [docs/LESSONS.md]
+
+- id: C-0053
+  date: 2026-08-13
+  target: project
+  statement: >
+    A stored crashing input re-crashes on libFuzzer startup replay, so a
+    persistent corpus must be minimized (-merge=1) or restarted from seeds after
+    findings.
+  kind: method
+  confidence: observed
+  provenance:
+    - machine-run:accumulated minja corpus segfaulted on startup; empty/fresh corpus ran clean
+  observation: >
+    Campaigns from an accumulated corpus segfaulted at startup while empty-corpus
+    fuzzing ran 60k clean. Individual seed files ran clean, so a specific
+    accumulated input (or the merge pass) was the trigger.
+  boundary: >
+    Observed on WSL for the minja target; the exact poisoning input was not
+    isolated. Remedy (fresh/minimized corpus) is confirmed to work; root cause of
+    the dir-replay segfault is not fully established.
+  status: active
+  refs: [targets/minja_template/README.md]
+
+- id: C-0054
+  date: 2026-08-13
+  target: project
+  statement: >
+    To fuzz PAST a known finding without disclosing a reproducer, apply the
+    recommended fix to the vendored dependency (a fuzz-blocker) and keep it
+    embargoed with the finding.
+  kind: method
+  confidence: verified
+  provenance:
+    - claim:C-0011
+    - machine-run:patched minja div/mod guards to let the render campaign explore deeper
+    - machine-run:GGUF 5-hunk fuzz-blocker precedent
+  observation: >
+    Patching the div/mod zero-guards into the vendored minja header let the
+    campaign explore past 0005. UBSan -fsanitize-recover handles benign UB
+    classes similarly. Fuzz-blockers for unreported bugs are disclosure artifacts.
+  boundary: >
+    The patched dependency is for hunting only; reproduction/confirmation for a
+    report must use pristine upstream. Keep the two headers distinct.
+  status: active
+  refs: [docs/LESSONS.md]

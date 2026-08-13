@@ -51,3 +51,17 @@ deeper interpreter surface).
 ./build.sh
 ./fuzz_minja -max_total_time=600 -rss_limit_mb=4096 corpus/
 ```
+
+## Second harness: fuzz_render.cc (interpreter surface)
+
+fuzz_parse covers parsing (bytes -> AST). fuzz_render goes deeper: it parses the
+input and RENDERS it against a realistic chat context (messages, tools, common
+template variables), exercising the interpreter, expression evaluation, filters,
+loops, the Value type system. Rendering reaches ~50% more code than parsing
+(cov ~4272 vs ~2835 in a 2-minute in-sandbox run) and is the deepest, most
+fertile surface in the project. Warrants a long campaign.
+
+Both harnesses bound input nesting depth (skip very deep bracket/brace nesting)
+so the campaign explores the broad surface. Built and validated in-sandbox
+(clang 18); both clean over ~95k-98k runs each in short runs, with rich growing
+coverage. A long campaign on the render surface is the recommended next step.

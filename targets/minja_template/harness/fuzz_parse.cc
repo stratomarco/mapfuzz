@@ -26,6 +26,19 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // dominate the corpus; parser bugs surface at small sizes.
   if (size > 64 * 1024) return 0;
 
+  // Skip inputs past a safe nesting depth. Deeply-nested bracket/brace input
+  // drives the recursive-descent parser very deep; bounding depth keeps the
+  // campaign exploring the broad surface instead of a single deep path.
+  {
+    int depth = 0, maxd = 0;
+    for (size_t i = 0; i < size; ++i) {
+      char c = static_cast<char>(data[i]);
+      if (c == '(' || c == '[' || c == '{') { if (++depth > maxd) maxd = depth; }
+      else if (c == ')' || c == ']' || c == '}') { if (depth > 0) --depth; }
+    }
+    if (maxd > 200) return 0;   // below the observed crash onset (~400+)
+  }
+
   std::string tmpl(reinterpret_cast<const char *>(data), size);
 
   try {

@@ -1,5 +1,9 @@
 .deps/
+fuzz_parse
+fuzz_render
 fuzz_minja
 crash-*
 oom-*
 timeout-*
+corpus_run/
+corpus_render/

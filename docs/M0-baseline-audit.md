@@ -100,3 +100,19 @@ newer-loaders are where the open ground is.
   shape, object-dtype all reject cleanly), but shape/dtype fields are loosely
   typed (string shapes interpreted byte-wise, exotic dtypes pass). A structure-
   aware fuzzer is warranted. Validated in-sandbox (flax 0.12.8 installed).
+
+## minja chat-template parser (llama.cpp C++ Jinja) [SELECTED - open, promising]
+
+- jinja2 (Python engine) IS in OSS-Fuzz, but minja (llama.cpp's from-scratch C++
+  reimplementation) is NOT, nor are consumers (llama-cpp-python/ollama/vllm/
+  transformers all 404). No fuzzer in the minja repo. Open ground.
+- Entry point: minja::Parser::parse(std::string, Options) (header-only, verified).
+  Trust boundary: chat templates ship inside model tokenizer configs and are
+  parsed+executed at inference (download-to-load-to-execute).
+- Built in-sandbox (clang 18, libFuzzer+ASan+UBSan). One low-severity real finding:
+  minja::Options has uninitialized bool members; `Options opts;` reads garbage
+  bools during parse (UBSan minja.hpp:2604). Fix = one line of defaults. Low sev,
+  caller-dependent reachability.
+- With Options initialized, parse is clean over 93k runs BUT with RICH growing
+  coverage (cov 2709, ft 8158), unlike other targets' shallow corridors. Genuinely
+  deep C++ parser worth a long campaign. Most promising open surface in the project.

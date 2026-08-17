@@ -1,0 +1,23 @@
+import sys
+from gguf import GGUFWriter
+OUT = sys.argv[1] if len(sys.argv) > 1 else "clip_seed.gguf"
+w = GGUFWriter(OUT, "clip")
+w.add_bool("clip.has_vision_encoder", True)
+w.add_string("clip.projector_type", "mlp")
+w.add_uint32("clip.vision.embedding_length", 32)
+w.add_uint32("clip.vision.block_count", 2)
+w.add_uint32("clip.vision.feed_forward_length", 64)
+w.add_uint32("clip.vision.attention.head_count", 4)
+w.add_uint32("clip.vision.image_size", 32)
+w.add_uint32("clip.vision.patch_size", 16)
+w.add_uint32("clip.vision.projection_dim", 32)
+w.add_float32("clip.vision.attention.layer_norm_epsilon", 1e-5)
+w.add_array("clip.vision.image_mean", [0.5, 0.5, 0.5])
+w.add_array("clip.vision.image_std", [0.5, 0.5, 0.5])
+w.add_string("general.architecture", "clip")
+w.add_string("general.name", "seed")
+w.write_header_to_file()
+w.write_kv_data_to_file()
+w.write_tensors_to_file()
+w.close()
+print(f"wrote {OUT}")

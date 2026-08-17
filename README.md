@@ -3,9 +3,6 @@
 Continuous, structure-aware fuzzing for the parsers and loaders of machine
 learning model artifacts.
 
-> Working codename. `mapfuzz` (Model Artifact Parser Fuzzer) is a placeholder
-> pending a final name.
-
 ## Thesis
 
 A model file downloaded from a public hub is attacker-controlled input fed into a

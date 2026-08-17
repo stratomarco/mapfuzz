@@ -116,3 +116,41 @@ newer-loaders are where the open ground is.
 - With Options initialized, parse is clean over 93k runs BUT with RICH growing
   coverage (cov 2709, ft 8158), unlike other targets' shallow corridors. Genuinely
   deep C++ parser worth a long campaign. Most promising open surface in the project.
+
+## clip/mmproj loader (llama.cpp multimodal projector) [SELECTED - open, yielded 2 findings]
+
+- llama.cpp IS in OSS-Fuzz, but its target list (fuzz_grammar, fuzz_json_to_grammar,
+  fuzz_apply_template, fuzz_load_model, fuzz_inference, fuzz_structured) does NOT
+  cover the mmproj/CLIP loader (tools/mtmd/clip.cpp). GBNF grammar parsing was
+  declined as saturated (fuzz_grammar exists); the mmproj loader was the open gap.
+- Entry point: clip_init(const char*, clip_context_params) -> clip_model_loader,
+  reached via a synthetic minimal mmproj GGUF (has_vision_encoder + mlp projector +
+  vision hparams). Trust boundary: mmproj files are downloaded model artifacts.
+- Built in-tree (clang 18, libFuzzer+ASan+UBSan, coverage instrumentation in the
+  library via -fsanitize=fuzzer-no-link). Two real findings: 0006 (scalar getter
+  type-confusion abort, SIGABRT) and 0007 (block_count unbounded allocation,
+  std::bad_alloc). Both confirmed in release, both fixed and submitted upstream.
+- After neutralizing both as fuzz-blockers, 22.8M runs clean on the hparam surface
+  (C-0035). A maintainer security-audit branch (xsn/security_audit_0) was
+  concurrently active on the same file, independently validating target selection.
+
+## LeRobot dataset-metadata loader (HuggingFace robotics) [EVALUATED - boundary exists, robust]
+
+- Not in OSS-Fuzz (404). Real download-to-load boundary: LeRobotDatasetMetadata
+  parses meta/info.json from a downloaded dataset via DatasetInfo.from_dict.
+- Probed in-venv (Python 3.12, lerobot[dataset]). from_dict raises raw
+  AttributeError/TypeError on malformed metadata (flax-tier robustness nit,
+  C-0022), and total_episodes flows into list(range(...)) unbounded (C-0023) BUT
+  the reachable site is dead on its only caller. No crash-tier finding. The
+  "download DoS" hypothesis was raised and retracted after caller analysis.
+- Outcome: largely robust (delegates to mature libs, guards the obvious cases).
+  Two non-findings recorded; no report warranted.
+
+## jax pickle_util [DECLINED - no defended boundary]
+
+- jax/jaxlib/cloudpickle all 404 in OSS-Fuzz (unfuzzed), but jax._src.pickle_util
+  .loads is a thin cloudpickle.loads passthrough for internal host callbacks.
+  Pickle executes code by design; there is no safe-parse intent to violate.
+- Declined (C-0042). Refines the target filter: "unfuzzed" is insufficient; a
+  target needs a DEFENDED trust boundary where a crash/divergence is a genuine
+  defect. minja and clip had one; raw pickle does not.

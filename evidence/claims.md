@@ -1,7 +1,7 @@
 # mapfuzz Research Evidence Base (rendered)
 
 > Generated from claims.yaml by evidence/tool.py. Do not edit by hand.
-> 20 claims.
+> 28 claims.
 
 ## Findings (real defects)
 
@@ -43,7 +43,7 @@
 - boundary: Bounds the panic class to two components; does not prove the entire codebase is otherwise panic-free under all inputs, only the component-construction surface probed.
 - refs: PRIVATE_findings/0002-0003-DISCLOSURE-REPORT.md
 
-### C-0010  (verified | severity: medium-low | status: embargoed)
+### C-0010  (verified | severity: medium-low | status: reported)
 **minja's recursive-descent expression parser has no depth limit; deeply nested expressions exhaust the stack and crash (SIGSEGV) at parse time (finding 0004).**
 
 - target: minja / Parser::parse
@@ -56,7 +56,7 @@
 - boundary: DoS via stack exhaustion; SIGSEGV is not a controllable write, no code-execution claim. Threshold is stack-size dependent, not a fixed count.
 - refs: PRIVATE_findings/0004-minja-parser-recursion-dos.md
 
-### C-0011  (verified | severity: medium-low | status: embargoed)
+### C-0011  (verified | severity: medium-low | status: reported)
 **minja performs integer division and modulo with no zero-divisor check at multiple sites; a zero divisor crashes the process with SIGFPE (finding 0005).**
 
 - target: minja / render (expression evaluation)
@@ -70,9 +70,35 @@
 - boundary: DoS via SIGFPE; not memory corruption, no code-execution claim. Scope corrected to multiple sites after a deeper campaign (see C-0012).
 - refs: PRIVATE_findings/0005-minja-division-by-zero.md
 
+### C-0013  (verified | severity: low | status: reported)
+**llama.cpp's mmproj loader scalar getters (get_bool/i32/u32/f32/string) check key presence but not GGUF type before the typed accessor, which GGML_ASSERTs on mismatch and aborts (SIGABRT). A wrong-typed hparam key aborts any loader (finding 0006).**
+
+- target: clip_mmproj / clip_model_loader scalar getters / clip_init
+- date: 2026-08-16
+- provenance:
+  - source-read:tools/mtmd/clip.cpp get_bool ~3687; typed accessors assert at gguf.cpp:194
+  - machine-run:release -O2 non-sanitized, exit 134 on has_vision_encoder (get_bool) and patch_size (get_u32)
+  - machine-run:coverage-guided libFuzzer+ASan+UBSan clip_init campaign
+- observation: Two scalar getters empirically confirmed to abort (get_bool, get_u32); class spans all scalar getters by shared code pattern. Array getters already validate type on master. Fix adds gguf_get_kv_type check before the typed accessor, mirroring the array-getter pattern; verified exit 134 -> clean exit 0.
+- boundary: DoS only (SIGABRT via failed assert); no memory corruption or code execution. Surface outside current OSS-Fuzz llama.cpp targets (none include clip/mtmd). Submitted upstream (ggml-org/llama.cpp harden-mmproj-metadata). Reproducers embargoed until PR merges.
+- refs: PRIVATE_findings/0006-clip-mmproj-type-confusion-abort.md
+
+### C-0014  (verified | severity: low | status: reported)
+**llama.cpp's mmproj loader sizes model.layers.resize(n_layer) from clip.vision.block_count with no bound beyond INT32_MAX and no cross-check vs actual tensors; a large declared block_count OOMs (std::bad_alloc) before any tensor is validated (finding 0007).**
+
+- target: clip_mmproj / clip_model_loader::load_tensors / clip.cpp:2156
+- date: 2026-08-16
+- provenance:
+  - source-read:clip.cpp:1269 block_count -> n_layer; clip.cpp:2155-2156 resize(n_layer)
+  - machine-run:block_count=201326592 -> std::bad_alloc (release) / ASan OOM ~137GB
+  - machine-run:n_embd/n_ff at 2e8 do NOT allocate (fail cleanly), scoping to block_count
+- observation: Confirmed specific to block_count. Passes get_u32's INT32_MAX cap yet still OOMs. Cleanly reachable on the normal load path. Fix bounds n_layer; verified bad_alloc -> clean exit 0. Distinct from 0006 (correctly-typed value).
+- boundary: DoS (resource exhaustion); no memory corruption or code execution. Submitted upstream in the same PR as 0006. Reproducers embargoed until PR merges.
+- refs: PRIVATE_findings/0007-clip-mmproj-block-count-alloc-dos.md
+
 ## Corrections
 
-### C-0012  (verified | status: embargoed)
+### C-0012  (verified | status: reported)
 **Finding 0005's true scope is five integer div/mod sites, not the two originally documented; a deeper campaign surfaced the BinaryOpExpr switch sites (Op::Div/DivDiv/Mod) in addition to the Value operators.**
 
 - target: minja
@@ -111,6 +137,31 @@
 - observation: UBSan flagged signed-integer-overflow at minja.hpp:497 and inf-out-of-range at json.hpp:5324. Non-sanitized build wraps/garbage-renders and exits 0. No crash.
 - boundary: NOT counted: UBSan-only, defined-in-practice on x86, no crash in release. A correctness/robustness observation (arithmetic does no range checking), not a DoS. Only the div/mod-by-zero cases (C-0011) actually crash.
 - refs: PRIVATE_findings/minja-0004-0005-DISCLOSURE-REPORT.md
+
+### C-0022  (verified | severity: none | status: active)
+**LeRobot's DatasetInfo.from_dict raises raw AttributeError/TypeError on malformed meta/info.json and silently accepts wrong-typed counts, rather than producing clean validation errors.**
+
+- target: lerobot / DatasetInfo.from_dict / __post_init__
+- date: 2026-08-14
+- provenance:
+  - machine-run:probe of DatasetInfo.from_dict, 10 malformed info.json variants
+  - source-read:utils.py:157 DatasetInfo; __post_init__ iterates features.values(); from_dict does cls(**data) with no type enforcement
+- observation: features as str/list -> AttributeError on .values(); feature value non-dict -> AttributeError on .get(); fps as str -> TypeError on '<='; missing fps/features -> TypeError. fps<=0 and chunks_size<=0 are cleanly rejected (ValueError). Wrong-typed total_episodes/total_frames construct silently.
+- boundary: NOT a crash/DoS: unhandled Python exceptions a caller could catch, wrong exception type only. Same class as the flax from_state_dict nit. Low severity; real trust boundary (downloaded Hub dataset metadata).
+- refs: docs/M0-baseline-audit.md
+
+### C-0023  (verified | severity: none | status: active)
+**total_episodes from untrusted metadata has no upper bound and flows into list(range(total_episodes)) at several sites; the allocation OOMs in isolation, but no clean reachability from untrusted metadata was demonstrated (the primary site is dead on its only caller).**
+
+- target: lerobot / resolve_episode_indices / get_episodes_file_paths / dataset_reader
+- date: 2026-08-14
+- provenance:
+  - machine-run:resolve_episode_indices(None, 10**12, exclude_episodes=[0]) -> MemoryError; 10**8 materialized 99,999,999 indices
+  - source-read:utils.py:116 list(range(total_episodes)) guarded only by <0; dataset_reader.py:221 range(total_episodes) when episodes is None
+  - source-read:lerobot_dataset.py:649-651 get_episodes_file_paths called ONLY when self.episodes is not None (user-list branch, not range())
+- observation: The unbounded range() allocation is confirmed (MemoryError at 10**12). But the download-path site takes the range branch only when episodes is None, while its sole caller invokes it only when episodes is not None, so that branch is dead on the download path. Other sites require already-loaded data.
+- boundary: NOT a confirmed DoS: the OOM primitive is real but no untrusted-metadata-to-OOM entry path was established. Latent unbounded-allocation. The initial "download DoS" hypothesis was retracted after reading the caller guard. Contrast: clip 0007 block_count is cleanly reachable.
+- refs: docs/M0-baseline-audit.md
 
 ## Negatives (robust surfaces)
 
@@ -178,6 +229,17 @@
 - boundary: Hardened against the declared-huge/resource-exhaustion class specifically. The 5 known bugs it reproduced are pre-existing/duplicate, not new findings.
 - refs: targets/gguf/, chassis/resource_oracle.py
 
+### C-0035  (verified | severity: none | status: active)
+**After neutralizing 0006 (scalar + array type checks) and 0007 (n_layer bound) as fuzz-blockers, an extended clip_init campaign ran 22,845,113 executions with no further crash, OOM, or UB on the hparam-parsing surface.**
+
+- target: clip_mmproj / clip_init / load_hparams
+- date: 2026-08-16
+- provenance:
+  - machine-run:libFuzzer+ASan+UBSan, 22845113 execs, cov 2102, DONE clean
+- observation: 22.8M runs (22845113 execs, cov 2102) clean. The reachable load_hparams surface is robust beyond 0006/0007 given the maintainers' existing guards (patch_size, n_head, INT32_MAX cap).
+- boundary: Maps the hparam-parsing surface only. The tensor-loading surface (needs a tensor-carrying seed) was not exercised; noted as future depth.
+- refs: targets/clip_mmproj/harness/fuzz_clip.cpp
+
 ## Audits (scope / M0)
 
 ### C-0040  (verified | status: active)
@@ -204,6 +266,32 @@
 - observation: jinja2 (Python) fuzzed; minja (C++ reimpl) and consumers (llama-cpp-python, ollama, vllm, transformers) all 404. Header-only, ~3077 lines.
 - boundary: Establishes the target is open and the boundary is real. Yielded two findings (C-0010, C-0011). Does not establish the interpreter is memory-unsafe (see the ongoing render campaign).
 - refs: docs/M0-baseline-audit.md, targets/minja_template/
+
+### C-0042  (verified | severity: none | status: active)
+**jax._src.pickle_util was evaluated and declined: it is a thin cloudpickle.loads passthrough for internal host callbacks, with no defended trust boundary (pickle executes code by design).**
+
+- target: jax / jax._src.pickle_util.loads
+- date: 2026-08-14
+- provenance:
+  - source-read:pickle_util.py loads() = cloudpickle.loads(data)
+  - source-read:OSS-Fuzz jax/jaxlib/cloudpickle all 404 (unfuzzed) but no defended boundary
+- observation: loads is a raw cloudpickle passthrough. Fuzzing yields either uninteresting malformed-pickle errors or the tautology that pickle executes code. No safe-parse intent to violate.
+- boundary: Refines the target-selection filter: "unfuzzed" is insufficient; a target needs a DEFENDED trust boundary where a crash/divergence is a genuine defect. Raw pickle has none.
+- refs: docs/M0-baseline-audit.md
+
+### C-0043  (verified | severity: low | status: reported)
+**Findings 0004 and 0005 were validated by Google Bug Hunters as product vulnerabilities (not VRP-rewarded, OT tier) and disclosed via direct upstream PR google/minja#92. Status flipped embargoed -> reported.**
+
+- target: minja / parseExpression / BinaryOpExpr / Value::operator
+- date: 2026-08-13
+- provenance:
+  - claim:C-0010
+  - claim:C-0011
+  - machine-run:reproduced on pristine minja main 2026-08-13 (0004 SIGSEGV exit 139; 0005 SIGFPE exit 136)
+  - machine-run:fixes verified against 239 real chat templates, zero regressions
+- observation: Google confirmed both are product vulnerabilities, not VRP-rewarded (minja in a lower OT tier), and invited a direct PR. Fixes: recursion depth cap 1000 (RAII DepthGuard) and divisor guards at all 5 div/mod sites. PR google/minja#92.
+- boundary: Reproducers un-embargo on PR merge, not before. C-0010/0011/0012 status flipped embargoed -> reported on this basis.
+- refs: PRIVATE_findings/minja-0004-0005-DISCLOSURE-REPORT.md
 
 ## Methods (lessons)
 
@@ -266,4 +354,17 @@
   - machine-run:GGUF 5-hunk fuzz-blocker precedent
 - observation: Patching the div/mod zero-guards into the vendored minja header let the campaign explore past 0005. UBSan -fsanitize-recover handles benign UB classes similarly. Fuzz-blockers for unreported bugs are disclosure artifacts.
 - boundary: The patched dependency is for hunting only; reproduction/confirmation for a report must use pristine upstream. Keep the two headers distinct.
+- refs: docs/LESSONS.md
+
+### C-0055  (verified | status: active)
+**M0 must check a project's actual OSS-Fuzz build.sh fuzz-target LIST, not just project membership. llama.cpp IS in OSS-Fuzz, but its targets do not cover the clip/mmproj loader, which was the real gap and yielded two findings.**
+
+- target: project
+- date: 2026-08-16
+- provenance:
+  - source-read:OSS-Fuzz projects/llamacpp/build.sh target list (fuzz_grammar, fuzz_json_to_grammar, fuzz_apply_template, fuzz_load_model, fuzz_inference, fuzz_structured)
+  - claim:C-0013
+  - claim:C-0014
+- observation: GBNF grammar parsing was declined as saturated (fuzz_grammar exists). The mmproj loader was an entry point not in the target list, and yielded two findings. A maintainer security-audit branch (xsn/security_audit_0) was concurrently active on the same file, independently validating the target selection.
+- boundary: Repeatable technique: in-OSS-Fuzz projects with entry points absent from their build.sh target list are the richest remaining vein.
 - refs: docs/LESSONS.md

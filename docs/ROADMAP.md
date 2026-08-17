@@ -9,13 +9,16 @@ framed as classical security engineering: the model file is a format, the loader
 is a parser, the download-to-load transition is a trust boundary.
 
 Delivered and working:
-- Five crash targets across three toolchains: GGUF (C++/libFuzzer), tokenizers
+- Crash targets across three toolchains: GGUF (C++/libFuzzer), tokenizers
   (Rust/cargo-fuzz + Python/Atheris), pytorch weights_only (Python/Atheris),
-  transformers config (Python/Atheris).
+  transformers config (Python/Atheris), minja and clip/mmproj (C++/libFuzzer).
 - Two cross-cutting oracles: cross-implementation differential (fast vs slow
   tokenizer) and resource-exhaustion (decompression-bomb / declared-huge class).
-- Two real findings (0002 decoder panic, 0003 normalizer panic), one systemic
-  .expect-on-deserialize class, consolidated into one disclosure.
+- Six real findings across four components: tokenizers 0002/0003 (reported to
+  HuggingFace), minja 0004/0005 (Google-validated, PR google/minja#92), clip/mmproj
+  0006/0007 (PR to ggml-org/llama.cpp with regression test). All DoS-class, all
+  coordinated-disclosed. Two targets evaluated and set aside honestly (LeRobot
+  robust, jax no defended boundary).
 - Proven technique: coverage-guided structure-STABLE generation (found 0003 in
   seconds; the pytorch corridor showed it needs a rich surface to pay off).
 - Triage chassis (dedup + classify, tested) and a continuous-fuzz CI pipeline
@@ -42,8 +45,9 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 
 ## Near-term
 
-- [ ] Submit the 0002+0003 disclosure (security@huggingface.co). Converts private
-      work to public credibility. Ready now; needs only the crediting line.
+- [x] Submitted the 0002+0003 disclosure (security@huggingface.co).
+- [x] minja 0004/0005 disclosed via PR google/minja#92 (Google-validated).
+- [x] clip 0006/0007 disclosed via PR to ggml-org/llama.cpp (with regression test).
 - [ ] Wire the two oracles (differential, resource) into the continuous pipeline
       so they run alongside the crash oracle, not just standalone. Completes the
       "continuous" story the corpus persistence started.
@@ -74,3 +78,18 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 - Re-fuzzing formats already in OSS-Fuzz.
 - Building weaponized exploits or new code-execution/config-injection vectors.
   Scope is defect demonstration (crash, DoS, divergence).
+
+## Where the vein stands (as of the clip work)
+
+The "newer / less-hardened loader" vein is largely worked out: GGUF hardened,
+tokenizers and minja and clip all yielded, LeRobot robust, jax declined. The
+repeatable technique that found clip is the sharpest remaining lead: in-OSS-Fuzz
+projects with an entry point ABSENT from their build.sh target list (check the
+list, not just membership). Next directions, in order of established promise:
+
+1. Apply the build.sh-gap technique to other in-OSS-Fuzz projects (breadth, low
+   barrier, already proven once).
+2. The cross-cutting classes OSS-Fuzz structurally cannot do: trust-boundary
+   composition and multi-implementation divergence.
+3. Deeper memory-corruption surfaces (e.g. the clip tensor-loading path, reached
+   only with a tensor-carrying seed) as a growth direction.

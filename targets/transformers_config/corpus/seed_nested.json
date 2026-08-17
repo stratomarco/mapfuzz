@@ -1,0 +1,1 @@
+{"model_type": "encoder-decoder", "encoder": {"model_type": "bert", "hidden_size": 16}, "decoder": {"model_type": "gpt2", "n_embd": 16}}

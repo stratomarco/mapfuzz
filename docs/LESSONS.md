@@ -71,3 +71,44 @@ Guardrail: pair a differential oracle with a structure-aware generator aimed at
 the divergence-prone categories (Unicode normalization forms, combining marks,
 control chars, byte-vs-char boundaries, subword-merge boundaries), not raw bytes.
 The oracle and the generator compose.
+
+## Check the OSS-Fuzz build.sh target LIST, not just project membership
+
+A project being in OSS-Fuzz does not mean the entry point you care about is
+fuzzed. llama.cpp IS in OSS-Fuzz, but its target list (fuzz_grammar,
+fuzz_json_to_grammar, fuzz_apply_template, fuzz_load_model, fuzz_inference,
+fuzz_structured) does not include the multimodal projector loader (tools/mtmd/
+clip.cpp). The GBNF grammar parser was correctly declined as saturated because
+fuzz_grammar exists; the mmproj loader was an open entry point in the same
+project and yielded two findings (0006, 0007). Guardrail: in M0, read the actual
+projects/<name>/build.sh and enumerate which entry points ARE and are NOT built
+as fuzz targets. In-OSS-Fuzz projects with an entry point absent from their
+build.sh are the richest remaining vein. Corroboration: a maintainer security-
+audit branch (xsn/security_audit_0) was concurrently active on the exact file,
+independently validating the target selection.
+
+## Confirm reachability before calling an allocation primitive a DoS
+
+An allocation that OOMs in isolation is not a finding until an untrusted-input
+path actually reaches it. LeRobot's resolve_episode_indices does
+list(range(total_episodes)) with only a <0 guard, and total_episodes comes from a
+downloaded info.json; in isolation range(10**12) raises MemoryError. But the
+download-path site takes the range branch only when episodes is None, while its
+sole caller invokes it only when episodes is not None, so that branch is dead on
+the reachable path. The "download DoS" hypothesis was retracted after reading the
+one caller. Contrast clip 0007, where block_count reaches model.layers.resize on
+the normal load path with no such guard. Guardrail: trace the primitive back to a
+real entry point through its actual callers before claiming a DoS; a confirmed
+OOM primitive plus an unreachable path is a non-finding, not a finding.
+
+## Re-confirm against pristine current upstream immediately before submitting
+
+Upstream moves. Before opening the clip PR, a fresh fork clone was on a newer
+master than the local working tree, and a wholesale file copy would have reverted
+recently-merged upstream guards (array is-array checks, n_merge, image_size,
+audio_chunk_size). A maintainer audit branch had also removed the array checks
+pending a rework. Guardrail: regenerate the patch against current master, diff it,
+and confirm each finding still reproduces on pristine current upstream before
+submitting. Scope the PR to only what is genuinely still missing (here: scalar
+type checks + n_layer bound; the array checks were already upstream and left
+untouched to avoid colliding with the maintainer's rework).

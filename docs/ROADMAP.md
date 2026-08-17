@@ -12,8 +12,11 @@ Delivered and working:
 - Crash targets across three toolchains: GGUF (C++/libFuzzer), tokenizers
   (Rust/cargo-fuzz + Python/Atheris), pytorch weights_only (Python/Atheris),
   transformers config (Python/Atheris), minja and clip/mmproj (C++/libFuzzer).
-- Two cross-cutting oracles: cross-implementation differential (fast vs slow
-  tokenizer) and resource-exhaustion (decompression-bomb / declared-huge class).
+- One cross-cutting oracle delivered and CI-wired: the cross-implementation
+  differential (fast vs slow tokenizer). The resource-exhaustion class is
+  validated by findings (clip block_count C-0014, LeRobot range C-0023, GGUF
+  resource negative) but is NOT yet packaged as a reusable oracle artifact with a
+  selftest; that remains to be written.
 - Six real findings across four components: tokenizers 0002/0003 (reported to
   HuggingFace), minja 0004/0005 (Google-validated, PR google/minja#92), clip/mmproj
   0006/0007 (PR to ggml-org/llama.cpp with regression test). All DoS-class, all
@@ -48,9 +51,13 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 - [x] Submitted the 0002+0003 disclosure (security@huggingface.co).
 - [x] minja 0004/0005 disclosed via PR google/minja#92 (Google-validated).
 - [x] clip 0006/0007 disclosed via PR to ggml-org/llama.cpp (with regression test).
-- [ ] Wire the two oracles (differential, resource) into the continuous pipeline
-      so they run alongside the crash oracle, not just standalone. Completes the
-      "continuous" story the corpus persistence started.
+- [x] Differential oracle wired into the continuous pipeline (differential-fuzz
+      job, invariant selftest + short divergence campaign).
+- [ ] Write chassis/resource_oracle.py with a --selftest (regression-guard the
+      declared-huge allocation class: flag a bomb, pass a benign loader, in a
+      memory-capped child) and wire it in. The class is proven by findings; the
+      reusable oracle artifact is not yet written. A CI job referencing it was
+      removed until the file exists.
 - [ ] Enrich thin seeds (one hand-made seed per target is a weak cold start).
 
 ## Medium-term

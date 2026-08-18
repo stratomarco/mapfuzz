@@ -115,7 +115,12 @@ UNVERIFIED (we have not checked).
   re-checked. GAP/UNFUZZED for newer loaders.
 - Bug classes: integer div-by-zero, OOB, type confusion, memory corruption.
 - mapfuzz status: PROBED, well mapped.
-  - GGUF: negative C-0030-tier (hardened; 0001 was a known duplicate).
+  - GGUF: negative C-0030-tier, scoped to the no_alloc metadata/descriptor
+    surface only (0001 was a known duplicate). IMPORTANT: the allocation-size
+    computation path was NOT exercised (no_alloc skips it), and that is where the
+    active GGUF integer-overflow CVE class lives (CVE-2025-53630, CVE-2026-27940,
+    oss-sec V-01..V-06, Talos 2024). Our negative is not a GGUF safety claim; see
+    docs/RELATED-WORK.md.
   - pytorch weights_only: negative C-0030 (robust).
   - flax checkpoint: non-finding + negative (loosely typed, no crash).
 

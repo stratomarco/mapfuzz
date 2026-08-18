@@ -35,8 +35,11 @@ tensorflow, onnx, safetensors, sentencepiece are all covered, including the RCE
 and format surfaces. "Fuzz another well-known format" duplicates professional
 work. mapfuzz's defensible value is the three things OSS-Fuzz does not do:
 
-1. Newer / less-hardened loaders not yet onboarded (GGUF and tokenizers Rust
-   internals were both open, and both yielded).
+1. Newer / less-hardened loaders not yet onboarded (tokenizers Rust internals,
+   minja, clip/mmproj were open and yielded). Note on GGUF: hardened only on the
+   no_alloc metadata surface we tested; the allocation-size-math class is active
+   and repeatedly reopened upstream (see docs/RELATED-WORK.md), not covered by our
+   harness.
 2. Cross-cutting bug CLASSES a single-project crash fuzzer misses (resource
    exhaustion, cross-implementation divergence, trust-boundary composition).
 3. The maintained, continuous, structure-aware machine itself.
@@ -65,8 +68,11 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 - [ ] Cross-version differential: same tokenizer through transformers N vs N-1.
       The untested differential angle with real regression-finding potential;
       needs two installed versions (runnable on a dev machine, not the sandbox).
-- [ ] Apply the resource oracle to a genuinely less-hardened loader (GGUF is
-      hardened and serves as calibration; the fertile ground is newer loaders).
+- [ ] Apply the resource oracle to a genuinely less-hardened loader. GGUF is
+      hardened ONLY on the no_alloc metadata/descriptor surface we tested and
+      serves as calibration there; its allocation-size-math path is an active CVE
+      class (see docs/RELATED-WORK.md), not calibration-clean. Fertile ground is
+      newer loaders and the size-math surface.
 - [ ] Structure-stable generation pointed at more tokenizer components and other
       rich-grammar loaders (the technique that found 0003, under-applied).
 
@@ -88,8 +94,10 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 
 ## Where the vein stands (as of the clip work)
 
-The "newer / less-hardened loader" vein is largely worked out: GGUF hardened,
-tokenizers and minja and clip all yielded, LeRobot robust, jax declined. The
+The "newer / less-hardened loader" vein is largely worked out: GGUF hardened on
+the no_alloc metadata surface we tested (but its size-math path is an active CVE
+class we did NOT exercise, see docs/RELATED-WORK.md), tokenizers and minja and
+clip all yielded, LeRobot robust, jax declined. The
 repeatable technique that found clip is the sharpest remaining lead: in-OSS-Fuzz
 projects with an entry point ABSENT from their build.sh target list (check the
 list, not just membership). Next directions, in order of established promise:

@@ -226,8 +226,8 @@
   - source-read:gguf.cpp dimension-product overflow guard (685-687)
   - machine-run:58M runs clean after 5-hunk fuzz-blocker patch
 - observation: Declared sizes checked vs remaining file bytes; n_tensors/n_kv bounded; dimension product overflow-guarded. 58M runs clean with blockers applied.
-- boundary: Hardened against the declared-huge/resource-exhaustion class specifically. The 5 known bugs it reproduced are pre-existing/duplicate, not new findings.
-- refs: targets/gguf/, chassis/resource_oracle.py
+- boundary: Scoped to metadata/tensor-descriptor parsing with no_alloc=true, at commit 432d7ffe. This configuration does NOT exercise the allocation-size-computation path (no_alloc skips allocation), which is where the GGUF integer-overflow CVE class lives: CVE-2025-53630 and its bypass CVE-2026-27940 (gguf_init_from_file _impl undersized heap alloc), oss-sec V-01..V-06 (2026-05-15, GGML_PAD/string/ n_dims/blck_size), and Talos 2024 (gguf_fread_str/ne/n_tensors heap overflows). Those remain an active, repeatedly-reopened class NOT covered by this harness. The declared-huge/resource-exhaustion negative holds only for the no_alloc descriptor-parse surface; it is not a claim that GGUF loading is memory-safe. The 5 bugs this harness reproduced are pre-existing/duplicate, not new findings.
+- refs: targets/gguf/, docs/RELATED-WORK.md
 
 ### C-0035  (verified | severity: none | status: active)
 **After neutralizing 0006 (scalar + array type checks) and 0007 (n_layer bound) as fuzz-blockers, an extended clip_init campaign ran 22,845,113 executions with no further crash, OOM, or UB on the hparam-parsing surface.**

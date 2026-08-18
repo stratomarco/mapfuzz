@@ -154,3 +154,17 @@ newer-loaders are where the open ground is.
 - Declined (C-0042). Refines the target filter: "unfuzzed" is insufficient; a
   target needs a DEFENDED trust boundary where a crash/divergence is a genuine
   defect. minja and clip had one; raw pickle does not.
+
+## gguf-py GGUFReader (llama.cpp Python GGUF reference reader) [SELECTED - yielded finding 0008]
+
+- Not a dedicated OSS-Fuzz target (llamacpp's targets cover C++ loaders, not the
+  Python gguf-py reader). gguf-py was named affected in the 2026-05-15 oss-sec GGUF
+  advisory (V-01..V-06), confirming the component is an active class.
+- Entry point: GGUFReader(path) which mmaps and parses an untrusted .gguf with its
+  own offset/count/recursion logic. Trust boundary: GGUF files are downloaded.
+- Fuzzed with Atheris (Python 3.12 venv; deps numpy, pyyaml). One finding: 0008,
+  unbounded array-length loop (DoS), minimized to 49 bytes, confirmed via 5s
+  timeout, and cross-impl grounded (C++ reader guards it, Python does not; C-0044).
+- This is the Python-reader surface the project's C++ GGUF harness (no_alloc,
+  gguf_init_from_buffer) did not and could not exercise, directly extending the
+  re-scoped GGUF negative (see docs/RELATED-WORK.md).

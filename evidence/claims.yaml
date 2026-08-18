@@ -695,3 +695,63 @@ claims:
     build.sh target list are the richest remaining vein.
   status: active
   refs: [docs/LESSONS.md]
+
+# ---- gguf-py reader finding (0008) ----
+- id: C-0015
+  date: 2026-08-19
+  target: gguf_py_reader
+  entry_point: GGUFReader / _get_field_parts (ARRAY branch)
+  statement: >
+    gguf-py's Python GGUFReader loops range(alen) over an untrusted uint64 array
+    length with no bound, no allocation guard, and no EOF-based termination, so a
+    49-byte crafted GGUF (array length 2^64-1) causes unbounded time/memory
+    (finding 0008).
+  kind: finding
+  confidence: verified
+  provenance:
+    - source-read:gguf-py/gguf/gguf_reader.py _get_field_parts ARRAY branch ~251-257 for idx in range(alen[0])
+    - machine-run:minimized 49-byte PoC, declared array length 2^64-1
+    - machine-run:GGUFReader(poc) times out at 5s (exit 124), DoS confirmed
+    - machine-run:_get past EOF returns short reads without raising, so the loop does not break
+  observation: >
+    A KV field of type ARRAY (9) with a huge declared length drives an unbounded
+    loop building growing Python lists. _get slices the mmap and returns short/empty
+    arrays past EOF without raising (asked 4 uint32 past EOF, got 1, no exception),
+    so the loop spins the full declared count. End-to-end timeout confirmed on a
+    49-byte input.
+  boundary: >
+    DoS only (resource exhaustion); Python is memory-safe, no corruption or code
+    execution. Root-caused to the single ARRAY-branch site. Reproducer/generator
+    embargoed (PRIVATE_findings/poc_0008_gen.py) until coordinated disclosure to
+    ggml-org/llama.cpp. Cross-impl: C++ reference reader guards this exact case
+    (see C-0044).
+  severity: low
+  status: embargoed
+  refs: [PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md]
+
+# ---- cross-impl asymmetry audit (C++ guards it, Python does not) ----
+- id: C-0044
+  date: 2026-08-19
+  target: gguf_py_reader
+  entry_point: gguf_read_emplace_helper (C++) vs _get_field_parts (Python)
+  statement: >
+    For the same untrusted array-length input, the C++ GGUF reference reader in the
+    same repo rejects cleanly while the Python reference reader hangs; the C++
+    defenses have no Python equivalent.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read:ggml/src/gguf.cpp gguf_read_emplace_helper returns false on short read; catches std::length_error and std::bad_alloc
+    - source-read:gguf-py/gguf/gguf_reader.py ARRAY branch has no bound, no alloc guard, no short-read termination
+    - claim:C-0015
+  observation: >
+    C++ reads the array via gr.read(value, n) with try/catch for length_error and
+    bad_alloc and a false-return on short read. Python loops range(alen) with none
+    of these. The maintainers already treat this input class as hostile in C++;
+    the Python reference impl is the weaker of the two readers in the same project.
+  boundary: >
+    Establishes finding 0008 as a concrete cross-impl inconsistency, not expected
+    behaviour. Lesson: a project's reference/secondary implementation may be weaker
+    than its production one; fuzz the reference impl, not only the primary.
+  status: active
+  refs: [docs/LESSONS.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md]

@@ -1,7 +1,7 @@
 # mapfuzz Research Evidence Base (rendered)
 
 > Generated from claims.yaml by evidence/tool.py. Do not edit by hand.
-> 28 claims.
+> 30 claims.
 
 ## Findings (real defects)
 
@@ -95,6 +95,20 @@
 - observation: Confirmed specific to block_count. Passes get_u32's INT32_MAX cap yet still OOMs. Cleanly reachable on the normal load path. Fix bounds n_layer; verified bad_alloc -> clean exit 0. Distinct from 0006 (correctly-typed value).
 - boundary: DoS (resource exhaustion); no memory corruption or code execution. Submitted upstream in the same PR as 0006. Reproducers embargoed until PR merges.
 - refs: PRIVATE_findings/0007-clip-mmproj-block-count-alloc-dos.md
+
+### C-0015  (verified | severity: low | status: embargoed)
+**gguf-py's Python GGUFReader loops range(alen) over an untrusted uint64 array length with no bound, no allocation guard, and no EOF-based termination, so a 49-byte crafted GGUF (array length 2^64-1) causes unbounded time/memory (finding 0008).**
+
+- target: gguf_py_reader / GGUFReader / _get_field_parts (ARRAY branch)
+- date: 2026-08-19
+- provenance:
+  - source-read:gguf-py/gguf/gguf_reader.py _get_field_parts ARRAY branch ~251-257 for idx in range(alen[0])
+  - machine-run:minimized 49-byte PoC, declared array length 2^64-1
+  - machine-run:GGUFReader(poc) times out at 5s (exit 124), DoS confirmed
+  - machine-run:_get past EOF returns short reads without raising, so the loop does not break
+- observation: A KV field of type ARRAY (9) with a huge declared length drives an unbounded loop building growing Python lists. _get slices the mmap and returns short/empty arrays past EOF without raising (asked 4 uint32 past EOF, got 1, no exception), so the loop spins the full declared count. End-to-end timeout confirmed on a 49-byte input.
+- boundary: DoS only (resource exhaustion); Python is memory-safe, no corruption or code execution. Root-caused to the single ARRAY-branch site. Reproducer/generator embargoed (PRIVATE_findings/poc_0008_gen.py) until coordinated disclosure to ggml-org/llama.cpp. Cross-impl: C++ reference reader guards this exact case (see C-0044).
+- refs: PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
 ## Corrections
 
@@ -292,6 +306,19 @@
 - observation: Google confirmed both are product vulnerabilities, not VRP-rewarded (minja in a lower OT tier), and invited a direct PR. Fixes: recursion depth cap 1000 (RAII DepthGuard) and divisor guards at all 5 div/mod sites. PR google/minja#92.
 - boundary: Reproducers un-embargo on PR merge, not before. C-0010/0011/0012 status flipped embargoed -> reported on this basis.
 - refs: PRIVATE_findings/minja-0004-0005-DISCLOSURE-REPORT.md
+
+### C-0044  (verified | status: active)
+**For the same untrusted array-length input, the C++ GGUF reference reader in the same repo rejects cleanly while the Python reference reader hangs; the C++ defenses have no Python equivalent.**
+
+- target: gguf_py_reader / gguf_read_emplace_helper (C++) vs _get_field_parts (Python)
+- date: 2026-08-19
+- provenance:
+  - source-read:ggml/src/gguf.cpp gguf_read_emplace_helper returns false on short read; catches std::length_error and std::bad_alloc
+  - source-read:gguf-py/gguf/gguf_reader.py ARRAY branch has no bound, no alloc guard, no short-read termination
+  - claim:C-0015
+- observation: C++ reads the array via gr.read(value, n) with try/catch for length_error and bad_alloc and a false-return on short read. Python loops range(alen) with none of these. The maintainers already treat this input class as hostile in C++; the Python reference impl is the weaker of the two readers in the same project.
+- boundary: Establishes finding 0008 as a concrete cross-impl inconsistency, not expected behaviour. Lesson: a project's reference/secondary implementation may be weaker than its production one; fuzz the reference impl, not only the primary.
+- refs: docs/LESSONS.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
 ## Methods (lessons)
 

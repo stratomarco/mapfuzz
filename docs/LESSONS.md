@@ -112,3 +112,17 @@ and confirm each finding still reproduces on pristine current upstream before
 submitting. Scope the PR to only what is genuinely still missing (here: scalar
 type checks + n_layer bound; the array checks were already upstream and left
 untouched to avoid colliding with the maintainer's rework).
+
+## A project's reference implementation may be weaker than its production one
+
+llama.cpp's C++ GGUF reader guards untrusted array lengths (gguf_read_emplace_helper
+returns false on short read and catches length_error and bad_alloc). The Python
+reference reader in the SAME repository (gguf-py) loops range(alen) over the same
+untrusted length with none of those guards, and hangs on a 49-byte file (finding
+0008). The maintainers already treat this input class as hostile in C++; the
+Python reference impl simply never received the equivalent hardening. Guardrail:
+when a project ships more than one implementation of the same parser (a fast
+production one and a reference/secondary one), fuzz the reference impl too. It is
+often less exercised, less hardened, and still reachable by real tooling
+(inspectors, converters, editors, CI that reads metadata). A cross-impl diff of
+how each handles the same untrusted field is a fast way to find the weaker one.

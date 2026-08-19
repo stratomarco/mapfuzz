@@ -168,3 +168,15 @@ newer-loaders are where the open ground is.
 - This is the Python-reader surface the project's C++ GGUF harness (no_alloc,
   gguf_init_from_buffer) did not and could not exercise, directly extending the
   re-scoped GGUF negative (see docs/RELATED-WORK.md).
+
+### gguf-py reader: surface fully characterized (2026-08-19)
+
+After finding 0008, the surface was mapped to completion: (1) a 2.2M-run negative
+past 0008 with the width bound applied (C-0036); (2) a nested-array recursion
+robustness gap (C-0024): the Python reader recurses per nesting level with no
+depth guard and raises an uncaught RecursionError beyond Python's default limit
+(~1000 levels), while the C++ reader rejects nested arrays as an invalid type and
+does not recurse. The recursion gap is caller-catchable and fast-failing, a low
+robustness nit, not a DoS. Net: one real finding (0008), one robustness
+non-finding (C-0024), otherwise robust on the parsing surface. Tensor-data
+materialization untested.

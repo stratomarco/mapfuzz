@@ -1,7 +1,7 @@
 # mapfuzz Research Evidence Base (rendered)
 
 > Generated from claims.yaml by evidence/tool.py. Do not edit by hand.
-> 30 claims.
+> 32 claims.
 
 ## Findings (real defects)
 
@@ -177,6 +177,19 @@
 - boundary: NOT a confirmed DoS: the OOM primitive is real but no untrusted-metadata-to-OOM entry path was established. Latent unbounded-allocation. The initial "download DoS" hypothesis was retracted after reading the caller guard. Contrast: clip 0007 block_count is cleanly reachable.
 - refs: docs/M0-baseline-audit.md
 
+### C-0024  (verified | severity: none | status: active)
+**gguf-py's GGUFReader recurses through nested ARRAY-of-ARRAY fields via _get_field_parts with no depth guard, so a nested array deeper than Python's recursion limit raises an uncaught RecursionError instead of a clean validation error.**
+
+- target: gguf_py_reader / GGUFReader / _get_field_parts (nested ARRAY recursion)
+- date: 2026-08-19
+- provenance:
+  - machine-run:crafted nested arrays; RecursionError at default limit 1000 (nested_1000.gguf ~12KB)
+  - machine-run:with recursionlimit raised to 100000, parsed to depth 20001 (confirms unbounded recursion, no internal guard)
+  - source-read:C++ gguf.cpp rejects array-of-array as invalid type (no recursion); scalar-only element read
+- observation: Depth instrumentation confirmed real recursion to the file's nesting depth. At the default limit the reader raises RecursionError, a catchable exception that fails fast (milliseconds), not a hang. The C++ reader does not recurse and rejects nested arrays as an invalid element type.
+- boundary: NOT a DoS and much weaker than 0008: RecursionError is caller-catchable and fast-failing, no unbounded resource use, no corruption (contrast 0008's unbounded hang). It is an uncaught-unexpected-exception-type robustness gap, same class as the LeRobot from_dict nit (C-0022). The reader should reject nested/over-deep arrays with a clean ValueError like its n_dims/alignment guards. Low severity; recorded for completeness, no report warranted on its own.
+- refs: docs/M0-baseline-audit.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
+
 ## Negatives (robust surfaces)
 
 ### C-0030  (verified | status: active)
@@ -253,6 +266,17 @@
 - observation: 22.8M runs (22845113 execs, cov 2102) clean. The reachable load_hparams surface is robust beyond 0006/0007 given the maintainers' existing guards (patch_size, n_head, INT32_MAX cap).
 - boundary: Maps the hparam-parsing surface only. The tensor-loading surface (needs a tensor-carrying seed) was not exercised; noted as future depth.
 - refs: targets/clip_mmproj/harness/fuzz_clip.cpp
+
+### C-0036  (verified | severity: none | status: active)
+**After blocking finding 0008 (array-length bound), an extended GGUFReader campaign ran 2,214,906 runs with no further crash on the parsing surface.**
+
+- target: gguf_py_reader / GGUFReader / _get_field_parts
+- date: 2026-08-19
+- provenance:
+  - machine-run:Atheris libFuzzer, 2214906 runs / 601s, cov 108 ft 354, DONE clean, against the 0008-blocked reader
+- observation: 2.2M runs clean past 0008. Coverage plateaued at 108 (a small, mostly linear parsing surface). The only crash-tier defect on this surface is 0008; the nested-array recursion (C-0024) is a caller-catchable robustness gap, not a crash.
+- boundary: Scoped to the metadata/KV parsing surface reached from GGUFReader with the 0008 width-bound applied. The tensor-data materialization surface (reading actual tensor bytes) was not exercised by this harness and is untested.
+- refs: targets/gguf_py_reader/harness/fuzz_gguf_reader.py
 
 ## Audits (scope / M0)
 

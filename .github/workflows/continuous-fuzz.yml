@@ -40,6 +40,21 @@ jobs:
           fi
           echo "OK: triage gate trips on a real finding (exit 1)"
 
+  # Resource-exhaustion oracle regression guard. Pure stdlib, fast. Runs the
+  # oracle self-test: it must flag an unbounded-allocation loader and an
+  # unbounded-loop loader (killed by a memory/time cap in a child process) and
+  # pass a correctly-bounded loader. Guards the declared-huge class (findings
+  # 0007/C-0014, 0008/C-0015, and C-0023).
+  resource-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Resource oracle self-test
+        run: python3 chassis/resource_oracle.py --selftest
+
   # Cross-implementation differential oracle. Verifies the fast/slow invariant
   # still holds (a broken invariant would make divergence findings untrustworthy)
   # and runs a short divergence campaign. A divergence would fail the job.

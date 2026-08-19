@@ -28,7 +28,7 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 
 ## safetensors [audited, deferred]
 
-- Result: not open. Ships its own fuzz target (`safetensors/fuzz/`), runs a per-commit automated security audit, and the core is deliberately minimal (~400 lines) with sequential offset validation. Deferred as already well-covered.
+- Result: not open. Ships its own in-repo cargo-fuzz target (verified 2026-08-19: safetensors/fuzz/fuzz_targets/fuzz_target_1.rs), and the core is deliberately minimal (~400 lines) with sequential offset validation. Deferred as well-covered by its own fuzzer. CORRECTION (2026-08-19): safetensors is NOT a dedicated OSS-Fuzz project (verified against the full 1372-project list); the coverage basis is its in-repo fuzzer, not an OSS-Fuzz project. Absence from the project list does not prove it is never exercised inside another harness.
 
 ## SentencePiece [audited, deferred]
 
@@ -73,7 +73,7 @@ Not yet audited. Repeat the same procedure for safetensors, ONNX, PyTorch/pickle
 ## Strategic note: mainstream ML formats are saturated in OSS-Fuzz
 
 Audit finding across this session: numpy, hdf5, h5py, keras, tensorflow, onnx,
-safetensors, sentencepiece are ALL in OSS-Fuzz (largely via AdaLogics). The
+sentencepiece and others are in OSS-Fuzz (largely via AdaLogics). NOTE (2026-08-19): safetensors is covered by its own in-repo cargo-fuzz target rather than a dedicated OSS-Fuzz project (see the safetensors entry above); the numpy/hdf5/onnx saturation claims below should each be re-verified against the current OSS-Fuzz project list rather than assumed. The
 obvious format-parser targets are taken. mapfuzz's defensible niche is therefore
 NOT "fuzz another mainstream format parser" but the surfaces OSS-Fuzz does not
 cover: (1) newer/smaller-ecosystem loaders not yet onboarded (llama.cpp GGUF was

@@ -14,9 +14,9 @@ Delivered and working:
   transformers config (Python/Atheris), minja and clip/mmproj (C++/libFuzzer).
 - One cross-cutting oracle delivered and CI-wired: the cross-implementation
   differential (fast vs slow tokenizer). The resource-exhaustion class is
-  validated by findings (clip block_count C-0014, LeRobot range C-0023, GGUF
-  resource negative) but is NOT yet packaged as a reusable oracle artifact with a
-  selftest; that remains to be written.
+  validated by findings (clip block_count C-0014, LeRobot range C-0023, gguf-py
+  array length C-0015) and is now packaged as a reusable oracle artifact with a
+  selftest (chassis/resource_oracle.py), CI-wired.
 - Six real findings across four components: tokenizers 0002/0003 (reported to
   HuggingFace), minja 0004/0005 (Google-validated, PR google/minja#92), clip/mmproj
   0006/0007 (PR to ggml-org/llama.cpp with regression test). All DoS-class, all
@@ -56,11 +56,11 @@ resource exhaustion) are a real part of the yield. They map what is solid.
 - [x] clip 0006/0007 disclosed via PR to ggml-org/llama.cpp (with regression test).
 - [x] Differential oracle wired into the continuous pipeline (differential-fuzz
       job, invariant selftest + short divergence campaign).
-- [ ] Write chassis/resource_oracle.py with a --selftest (regression-guard the
-      declared-huge allocation class: flag a bomb, pass a benign loader, in a
-      memory-capped child) and wire it in. The class is proven by findings; the
-      reusable oracle artifact is not yet written. A CI job referencing it was
-      removed until the file exists.
+- [x] Wrote chassis/resource_oracle.py with a --selftest (regression-guards the
+      declared-huge allocation class: flags an unbounded-allocation loader and an
+      unbounded-loop loader via a memory/time cap in a child process, passes a
+      bounded loader) and re-wired the CI job. The class is proven by findings
+      0007/C-0014, 0008/C-0015, and C-0023.
 - [ ] Enrich thin seeds (one hand-made seed per target is a weak cold start).
 
 ## Medium-term

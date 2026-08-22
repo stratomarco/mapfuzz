@@ -180,3 +180,21 @@ does not recurse. The recursion gap is caller-catchable and fast-failing, a low
 robustness nit, not a DoS. Net: one real finding (0008), one robustness
 non-finding (C-0024), otherwise robust on the parsing surface. Tensor-data
 materialization untested.
+
+## huggingface_hub download/cache path-traversal [EVALUATED - defended boundary, negative]
+
+- Not an OSS-Fuzz project, and the download boundary (repo-controlled filename ->
+  local cache path) is the classic path-traversal surface. Real threat model:
+  a malicious repo ships a crafted filename.
+- Result: properly defended. _validate_relative_filename (_local_folder.py:199)
+  rejects '..' segments, absolute/root, Windows drive, drive-relative, and UNC
+  paths, checked under BOTH POSIX and Windows rules cross-OS (the docstring even
+  addresses the UNC NetNTLMv2 hash-leak). Independently, _get_pointer_path
+  (file_download.py:2056) containment-checks the final joined path against the
+  snapshot dir. Two correct, independent layers.
+- Deliberate design note: the containment check uses lexical abspath, not
+  symlink-resolving resolve(); a symlink escape would need pre-existing attacker
+  write access to the cache (out of threat model).
+- Outcome: defended-boundary negative (C-0045). Not a productive input-fuzz target.
+  Documented as a mapping of what is solid, and as good defensive work by the
+  maintainers. Pivot to a softer surface (the quantize stage).

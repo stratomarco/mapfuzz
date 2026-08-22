@@ -843,34 +843,3 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md]
-
-# ---- huggingface_hub download path-traversal: defended boundary (negative/audit) ----
-- id: C-0045
-  date: 2026-08-19
-  target: huggingface_hub
-  entry_point: hf_hub_download / _validate_relative_filename / _get_pointer_path
-  statement: >
-    huggingface_hub's download path-construction boundary is properly defended
-    against the path-traversal class: a repo-controlled filename is validated
-    before use and the joined path is containment-checked against the snapshot dir.
-  kind: audit
-  confidence: verified
-  provenance:
-    - source-read:_local_folder.py:199 _validate_relative_filename rejects '..' segments, absolute/root, Windows drive, drive-relative, and UNC paths, checked under BOTH PurePosixPath and PureWindowsPath rules cross-OS
-    - source-read:file_download.py:1067 validator called before path use; :2056 _get_pointer_path raises if abspath(pointer) is not under abspath(snapshot_path)
-    - source-read:file_download.py:1069 relative_filename = os.path.join(*filename.split('/'))
-  observation: >
-    Two independent correct defenses: a front-line validator covering .., absolute,
-    drive, drive-relative, and UNC forms under both OS rule sets (with the NetNTLMv2
-    UNC hash-leak explicitly addressed), plus a post-join containment check on the
-    final resolved path. The validator is threat-model-aware, not naive.
-  boundary: >
-    Defended boundary; not a productive fuzz target for input-driven traversal.
-    One deliberate design note: _get_pointer_path uses os.path.abspath (lexical) not
-    resolve() (symlink-following) for the containment check, a documented tradeoff;
-    a symlink-based escape would require pre-existing attacker write access to the
-    cache, which is out of this threat model. Recorded as a mapping of what is
-    solid, mirrors the pytorch/GGUF negatives. Pivot to a softer surface.
-  severity: none
-  status: active
-  refs: [docs/M0-baseline-audit.md]

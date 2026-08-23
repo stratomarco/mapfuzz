@@ -875,3 +875,36 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md]
+
+# ---- gptqmodel QuantizeConfig defended boundary (audit) ----
+- id: C-0046
+  date: 2026-08-19
+  target: gptqmodel
+  entry_point: QuantizeConfig __post_init__ validation
+  statement: >
+    gptqmodel validates the quantize-config fields that feed downstream size and
+    bit arithmetic. bits must resolve to a supported width, and group_size must be
+    -1 or a positive value, so a downloaded quantize_config.json cannot drive a
+    div-by-zero from a zero bits or zero group_size into the pack and unpack math.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read config.py line 2705 rejects group_size that is not -1 and is not positive
+    - source-read config.py lines 2622 to 2634 validate bits against the supported width set with a raise
+    - source-read config.py line 2613 validates dynamic per-layer group_size, and lines 3629 and 3731 reject misused group_size in FP8 and BnB configs
+  observation: >
+    Both div-by-zero candidates (a zero bits reaching the 32-over-bits math, and a
+    zero group_size reaching the grouping math) are rejected at config construction.
+    Validation covers the main config, the dynamic per-layer path, and the
+    format-specific configs. Source-read verdict, since the package import was
+    blocked by its heavy model-zoo dependency chain and the guards were read directly.
+  boundary: >
+    Defended boundary on the config-parsing surface. Not verified by execution
+    because the dependency chain blocked a clean import, and the source clearly
+    shows the guards. The GPU pack and unpack kernels were not fuzzed because they
+    require CUDA, and their div-by-zero inputs are gated by this upstream config
+    validation. Same pattern as the other maintained loaders, hardened on the
+    obvious classes.
+  severity: none
+  status: active
+  refs: [docs/M0-baseline-audit.md]

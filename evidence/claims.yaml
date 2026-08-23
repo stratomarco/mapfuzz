@@ -843,3 +843,35 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md]
+
+# ---- gguf-py reader tensor path: hardened (negative) ----
+- id: C-0037
+  date: 2026-08-19
+  target: gguf_py_reader
+  entry_point: GGUFReader._build_tensors (tensor path) / quants.py
+  statement: >
+    The gguf-py reader tensor path handles hostile tensor metadata cleanly: huge
+    declared dims fail with a numpy reshape ValueError, the quant type is validated
+    via an enum cast, and no quant type has a zero block_size or is missing from the
+    size table, so the size math does not divide by zero or KeyError.
+  kind: negative
+  confidence: verified
+  provenance:
+    - machine-run:tensor with dims 2^32 x 2^32 -> ValueError cannot reshape array of size 0, no hang/OOM (5s timeout not hit)
+    - source-read:gguf_reader.py:331 ggml_type = GGMLQuantizationType(raw_dtype[0]) raises ValueError on unknown type
+    - machine-run:all 35 GGMLQuantizationType values have nonzero block_size and are present in GGML_QUANT_SIZES (no div-by-zero at :338, no KeyError at :337)
+    - source-read:gguf_reader.py:334 deliberate Python-int n_elems to avoid uint64 overflow (documented guard)
+  observation: >
+    Probed the tensor path directly (not exercised by the 0008 KV-focused harness).
+    Huge dims clean-error on reshape; type cast guards unknown types; the size table
+    is complete with nonzero block sizes. n_elems uses Python ints by design to
+    avoid silent overflow. No crash, hang, or unbounded allocation found on this path.
+  boundary: >
+    Scoped to the tensor-info parse and size computation. The finding on this
+    component is 0008 (KV array-length loop); the tensor path itself is hardened.
+    Actual tensor-data dequantization on adversarial bytes was not separately
+    fuzzed; numpy reshape strictness makes size-mismatch a clean error, but a
+    dedicated dequant campaign is future depth.
+  severity: none
+  status: active
+  refs: [docs/M0-baseline-audit.md]

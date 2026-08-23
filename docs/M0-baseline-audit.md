@@ -198,3 +198,14 @@ materialization untested.
 - Outcome: defended-boundary negative (C-0045). Not a productive input-fuzz target.
   Documented as a mapping of what is solid, and as good defensive work by the
   maintainers. Pivot to a softer surface (the quantize stage).
+
+### gguf-py tensor path: hardened (2026-08-19)
+
+Probed the tensor path (untested by the 0008 KV-focused harness). Huge declared
+dims (2^32 x 2^32) fail cleanly with a numpy reshape ValueError (no hang/OOM);
+the quant type is validated via an enum cast (unknown type -> ValueError); all 35
+quant types have nonzero block_size and are present in GGML_QUANT_SIZES (no
+div-by-zero at :338, no KeyError at :337); n_elems uses Python ints by design to
+avoid uint64 overflow. Net on gguf-py: one finding (0008, KV array-length loop),
+one recursion nit (C-0024), tensor path hardened (C-0037). Component thoroughly
+mapped; pivoting to third-party quantizers where the SoK's empty cell likely is.

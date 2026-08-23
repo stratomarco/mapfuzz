@@ -908,3 +908,36 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md]
+
+# ---- decompression-bomb / zip-slip sweep across loaders (negative) ----
+- id: C-0038
+  date: 2026-08-19
+  target: project
+  entry_point: decompression call sites across huggingface_hub, gptqmodel, llama.cpp tooling
+  statement: >
+    A sweep for the decompression-bomb and zip-slip class across the download and
+    container-handling paths of the maintained loaders found them defended. DDUF
+    refuses compressed entries and reads by offset without disk extraction, and the
+    gptqmodel machete downloader uses the safe tar extraction filter.
+  kind: negative
+  confidence: verified
+  provenance:
+    - source-read huggingface_hub _dduf.py line 136 rejects any entry whose compress_type is not ZIP_STORED, so no decompression bomb, and it reads entries by mmap offset rather than extracting to disk, so no zip-slip
+    - source-read huggingface_hub _dduf.py _validate_dduf_entry_name enforces an allowlist of extensions, rejects backslash separators, and allows at most one directory level
+    - source-read gptqmodel machete.py line 168 to 172 passes filter data to tarfile extractall on Python 3.12 and later, from a pinned HTTPS NVIDIA release URL
+  observation: >
+    Probed the decompression class specifically since it is a different mechanism
+    from the declared-huge count class. DDUF designs out both bomb (no compression)
+    and zip-slip (no extraction). Machete uses the version-gated safe filter and a
+    trusted pinned URL. No attacker-reachable bomb or traversal found in the model
+    threat model.
+  boundary: >
+    Scoped to the decompression sites reachable in the download and container paths
+    of these maintained libraries. One narrow defense-in-depth nit noted and not
+    counted as a finding: machete on Python 3.11 and earlier extracts without the
+    filter, but only from a trusted pinned URL and only on old Python, a stacked
+    precondition well below the finding bar. The broader lesson is that maintained
+    central code is consistently hardened on the classes tested this session.
+  severity: none
+  status: active
+  refs: [docs/M0-baseline-audit.md]

@@ -941,3 +941,36 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md]
+
+# ---- GGUF metadata -> llama.cpp consumer: composition boundary defended (negative) ----
+- id: C-0039
+  date: 2026-08-19
+  target: llama_cpp_consumer
+  entry_point: llama-model.cpp hparam load and llama-model-loader.cpp get_key_or_arr
+  statement: >
+    The GGUF-metadata to llama.cpp-consumer composition boundary is defended,
+    including cross-field consistency. Values that a GGUF parser accepts as
+    well-formed are re-checked for semantic safety by the consumer before use as
+    divisors, sizes, or per-layer array lengths.
+  kind: negative
+  confidence: verified
+  provenance:
+    - source-read llama-model.cpp line 1109 asserts n_layer_all is greater than 0 and at most LLAMA_MAX_LAYERS
+    - source-read llama-model.cpp line 1208 guards the n_embd over n_head division behind a check that n_head is greater than 0, and llama-hparams.cpp line 78 guards n_head_kv equal to 0
+    - source-read llama-model-loader.cpp line 454 get_key_or_arr rejects n greater than N_MAX, and rejects a metadata array whose length does not equal the expected per-layer count n
+  observation: >
+    Probed the consumer side rather than the parser. The divisor field head_count
+    is guarded against 0, the layer count is bounded against the fixed maximum, and
+    the per-layer arrays are fixed-size std::array of size N_MAX pre-zeroed at load.
+    The cross-field check that a metadata array length must equal the layer count
+    prevents both an over-long copy into the fixed buffer and a short-array
+    out-of-bounds read. Safe by construction.
+  boundary: >
+    Scoped to the hparam load path and the get_key_or_arr array handling in a
+    current llama.cpp checkout. This is the most-scrutinized pair in the ecosystem
+    and it validates cross-field consistency, not just per-field type. The
+    composition thesis is better tested on cross-maintainer pairs where the
+    producer and consumer are separate codebases. Strong defended result here.
+  severity: none
+  status: active
+  refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]

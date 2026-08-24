@@ -974,3 +974,38 @@ claims:
   severity: none
   status: active
   refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]
+
+# ---- DDUF -> diffusers composition seam: real CVE class, already public (audit / prior-art) ----
+- id: C-0047
+  date: 2026-08-19
+  target: diffusers
+  entry_point: DiffusionPipeline.from_pretrained dynamic component load from model_index.json
+  statement: >
+    The DDUF-to-diffusers composition seam, where a model config names component
+    libraries and classes that the loader dynamically imports and instantiates, is
+    a real high-severity vulnerability class. It is already public as the FaceHugger
+    set and is not a novel finding. Our composition M0 reached the same seam
+    independently, which validates the method.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read pipeline_loading_utils.py get_class_obj_and_candidates imports library_name from config with importlib and the trust gate sat on a different path
+    - web huggingface diffusers security advisory GHSA-j7w6-vpvq-j3gm None.py trust_remote_code bypass verified against a DDUF pipeline
+    - web CVE-2026-44513 and CVE-2026-44827 and CVE-2026-45804 FaceHugger by Zafran Security, config-as-code TOCTOU, fixed in diffusers 0.38.0 May 2026
+    - web parallel transformers config injection CVE-2026-4372 via attn implementation internal, same root cause
+  observation: >
+    Zafran root cause matches the composition thesis directly. The trust check runs
+    in one phase while the code load runs in another, so config content the gate did
+    not see crosses into executed code. CVE-2026-44827 is the DDUF case exactly, a
+    model_index.json declaring a standard class name while silently loading code.
+    Reached blind via the composition M0 before the prior-art check surfaced it.
+  boundary: >
+    NOT a novel finding. Recorded as prior art and as method validation. The
+    composition angle independently converged on the seam that produced four CVEs,
+    which corroborates that trust-boundary composition is where serious ML supply
+    chain bugs live. Popular libraries diffusers and transformers are now actively
+    researched for this class, so novel work in it should target quieter component
+    pairs or a different bug class such as native memory corruption.
+  severity: none
+  status: active
+  refs: [docs/RELATED-WORK.md, docs/THREAT-MODEL.md]

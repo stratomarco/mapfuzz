@@ -1009,3 +1009,38 @@ claims:
   severity: none
   status: active
   refs: [docs/RELATED-WORK.md, docs/THREAT-MODEL.md]
+
+# ---- clip C++ tensor-loading path: defended (audit) ----
+- id: C-0048
+  date: 2026-08-19
+  target: clip_mmproj
+  entry_point: tools/mtmd/clip.cpp tensor data load loop
+  statement: >
+    The clip mmproj C++ tensor-loading path is defended against the overflow and
+    out-of-bounds class. Read sizes are derived from the allocated tensor via
+    ggml_nbytes rather than from file-controlled values, tensor offsets come from
+    the hardened gguf_init_from_file parser, and the vector helper is constrained
+    to F32 so its byte count is always 4-aligned.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read clip.cpp line 3505 num_bytes is ggml_nbytes(cur) from the allocated tensor, and line 3506 reads that exact size into cur->data, with the temp-buffer branch resizing to match
+    - source-read clip.cpp line 3499 to 3502 the seek is error-checked before the read
+    - source-read clip.cpp line 2114 get_vector rejects any tensor that is not F32 before reading, so n_bytes is always a multiple of 4 and result sized n_bytes over 4 floats fits the read exactly
+    - source-read clip.cpp line 1154 offsets come from gguf_init_from_file, the parser hardened by the recent GGUF offset and size CVE fixes
+  observation: >
+    Probed the tensor-data path that the earlier clip harness did not reach (it
+    stopped at hparam parsing, C-0035). Two overflow hypotheses (a 1-3 byte overflow
+    from integer truncation in get_vector, and a file-controlled read size exceeding
+    the allocation in the main loop) both dissolved on close reading. Reads are
+    allocation-bounded and offsets are parser-validated.
+  boundary: >
+    Scoped to the tensor read path in a current llama.cpp checkout. The clip
+    findings are 0006 and 0007 on the metadata path (found, PR 27202). The tensor
+    path is defended. One low-severity residual noted and not a finding, a short
+    read past EOF could leave an uninitialized tail in a tensor buffer, but the
+    read size matches the allocation so there is no overflow. CVE-tier memory
+    corruption not present on this surface.
+  severity: none
+  status: active
+  refs: [docs/M0-baseline-audit.md, PRIVATE_findings]

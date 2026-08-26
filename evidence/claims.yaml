@@ -1044,3 +1044,37 @@ claims:
   severity: none
   status: active
   refs: [docs/M0-baseline-audit.md, PRIVATE_findings]
+
+# ---- vLLM serving layer: sampling-param token-id seam defended (audit) ----
+- id: C-0049
+  date: 2026-08-19
+  target: vllm
+  entry_point: SamplingParams verify and v1 sampler token-id application
+  statement: >
+    The vLLM serving layer defends the sampling-parameter token-id seam. Request
+    fields that become indices into the logits or vocab are validated against
+    vocab size in a model-aware pass before the engine uses them, so a
+    well-formed but out-of-vocab token id from a request does not reach an
+    unbounded tensor index.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read sampling_params.py _validate_allowed_token_ids rejects any id that is negative or at least vocab_size, called from verify with the tokenizer on the SamplingParams path in input_processor.py line 97
+    - source-read v1 sample ops bad_words.py applies the mask via a slice assignment logits last_token_id to last_token_id plus 1, which clamps silently and cannot go out of bounds
+    - source-read gpu_input_batch.py builds allowed_token_ids_mask sized to vocab_size, and the raw ids reaching the fancy-index are gated by the model-aware validator upstream
+  observation: >
+    Traced the token-id-as-index seam through three consumers. The bad_words path
+    is safe by slice-clamp semantics. The allowed_token_ids path is guarded by a
+    deferred model-aware validator that runs once vocab is known, the correct place
+    for a check the request layer cannot make. The second verify call site is for
+    PoolingParams, a different parameter type, not a bypass of the SamplingParams check.
+  boundary: >
+    Scoped to the sampling-parameter token-id fields on the SamplingParams path in
+    a current vLLM checkout. One narrow non-default thread not pursued, the vocab
+    check is gated on tokenizer being present, so a skip-tokenizer-init deployment
+    could in principle skip it, an unusual mode that may not expose the field. The
+    main result extends the seam-checking pattern from file loaders into the serving
+    runtime, vLLM defers the vocab check to where vocab is known.
+  severity: none
+  status: active
+  refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]

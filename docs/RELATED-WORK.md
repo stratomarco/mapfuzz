@@ -48,6 +48,26 @@ path where the entire CVE class above lives. The negative is accurate for its
 surface and is explicitly NOT a claim that GGUF loading is memory-safe. See the
 GGUF claim boundary in evidence/claims.yaml.
 
+### Composition / config-as-code at the loader-runtime seam (active, disclosed)
+A distinct and severe class lives at the seam between a component that validates a
+model config as data and a later component that turns config-named classes into
+running code. In 2026 a set of high-severity CVEs (the FaceHugger set:
+CVE-2026-44513, CVE-2026-44827, CVE-2026-45804, plus the parallel transformers
+config-injection CVE-2026-4372) disclosed exactly this: a config file names
+component classes, one layer validates it as well-formed, a later layer loads and
+runs it, and the trust check sat in a different phase than the code load (a TOCTOU
+across the seam). CVE-2026-44827 is the DDUF case, a model package declaring a
+standard-looking class name while achieving code execution. These are fixed in
+diffusers 0.38.0.
+
+mapfuzz does NOT claim this class. It is recorded here as prior art and as method
+validation: an independent composition-angle pass on the DDUF-to-diffusers seam
+reached the same import-from-config surface before the public disclosure was
+found (evidence C-0047). That convergence corroborates the seam thesis but the
+findings are not ours. The popular libraries in this class (diffusers,
+transformers) are now actively researched, so novel work should target quieter
+component pairs or a different bug class.
+
 ## What this project does claim as its contribution
 
 ### 1. Active fuzzing at the under-examined boundaries
@@ -70,7 +90,19 @@ convert and quantize stages are an attacker-reachable, essentially unfuzzed
 surface. This is the prioritized direction (see docs/THREAT-MODEL.md), and it is
 NOT covered by the retrospective SoK or the GGUF-core fuzzing others have done.
 
-### 3. A reproducible, provenance-preserving methodology
+### 3. The seam-checking pattern holds across layers, not just file loaders
+Probing the serving layer (vLLM v1, 2026-08-19) extended the thesis beyond file
+loading. The sampling-parameter token-id seam, where a request field becomes an
+index into the logits or vocab, is defended by a model-aware validator that runs
+once vocab size is known (evidence C-0049). This is the same pattern found in the
+file loaders: the check lives where the needed context exists, not at the request
+layer that cannot know it. The observation is that "valid for whose purpose" is a
+cross-layer principle, demonstrated from GGUF metadata parsing up through
+inference-server request handling, and that mature ML infrastructure defends
+itself by deferring each check to the boundary where it can be made. This
+reframes the contribution from a loader-specific result to a cross-layer one.
+
+### 4. A reproducible, provenance-preserving methodology
 Independent of any single finding: a deterministic evidence base (every claim
 carries provenance, an explicit boundary, and a status; negatives must state
 effort; a validator gates the schema), honest severity calibration (robustness

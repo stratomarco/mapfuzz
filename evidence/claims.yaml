@@ -1078,3 +1078,37 @@ claims:
   severity: none
   status: active
   refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]
+
+# ---- Triton request-path memory-corruption seams: defended (audit) ----
+- id: C-0060
+  date: 2026-08-19
+  target: triton
+  entry_point: shape-size math GetElementCount and GetByteSize, and shared-memory GetMemoryInfo
+  statement: >
+    Triton's request-path memory-corruption seams are defended with explicit
+    overflow guards. The shape-to-bytes multiply checks each product against
+    INT64_MAX before multiplying, and the shared-memory offset-plus-byte-size path
+    checks byte_size against SIZE_MAX minus offset before adding, then bounds the
+    result against the registered region size.
+  kind: audit
+  confidence: verified
+  provenance:
+    - source-read model_config.h GetElementCount checks cnt greater than INT64_MAX over dim before each multiply and returns an overflow sentinel, and handles wildcard and negative dims
+    - source-read model_config.h GetByteSize checks cnt greater than INT64_MAX over dt_size before the element-times-dtype multiply and propagates the overflow sentinel
+    - source-read shared_memory_manager.cc GetMemoryInfo line 477 checks byte_size greater than SIZE_MAX minus offset before the addition, after bounding offset against region size at 469, then checks the sum against region size at 490 before handing out the pointer at 503
+  observation: >
+    Deliberately hunted memory corruption rather than DoS at the two highest-risk
+    spots in a mature serving runtime, the shape-size arithmetic and the
+    shared-memory offset-plus-size path. Both apply the overflow-safe formulation,
+    with a comment showing the overflow was consciously considered. The shared
+    memory path is the single most likely out-of-bounds source in a serving runtime
+    and it is closed.
+  boundary: >
+    Scoped to the request-path size arithmetic and shared-memory bounds in a
+    current Triton checkout. The model repository remains trusted by NVIDIA's
+    documented threat model and was not treated as an attack surface. The result
+    extends the maintained-core-hardened finding to the memory-corruption tier on a
+    serving runtime, both DoS-class and overflow-class seams are defended.
+  severity: none
+  status: active
+  refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]

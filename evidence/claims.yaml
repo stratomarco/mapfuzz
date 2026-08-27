@@ -1112,3 +1112,39 @@ claims:
   severity: none
   status: active
   refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]
+
+# ---- TensorRT-LLM unguarded head_size division: robustness non-finding ----
+- id: C-0025
+  date: 2026-08-19
+  target: tensorrt_llm
+  entry_point: PretrainedConfig __init__ via from_checkpoint and from_json_file
+  statement: >
+    TensorRT-LLM computes head_size as hidden_size floor-divided by
+    num_attention_heads without validating that num_attention_heads is positive.
+    A checkpoint config.json with num_attention_heads set to 0 reaches the division
+    and raises ZeroDivisionError on load. This is a low-severity robustness gap,
+    not a security finding, checkpoint loading is a trusted-input offline build
+    step per the documented conversion workflow.
+  kind: non-finding
+  confidence: verified
+  provenance:
+    - source-read modeling_utils.py line 447 head_size = hidden_size floordiv num_attention_heads with no positivity check anywhere in __init__
+    - source-read modeling_utils.py from_json_file line 511 json.load then from_dict, from_dict line 496 config_cls of the file dict as kwargs, from_checkpoint line 526 loads config.json by the same path
+    - reachability confirmed by source-read, a crafted config.json with num_attention_heads 0 reaches the division
+  observation: >
+    A sibling issue at line 494 MODEL_MAP indexed by config architecture raises
+    KeyError on an unknown architecture string, same DoS-on-load class, also a dict
+    lookup not a dynamic import so not a code-execution class. Both are
+    crash-on-malformed-config robustness gaps at model load.
+  boundary: >
+    Reachable from a checkpoint config file. Severity low, the impact is a raw
+    ZeroDivisionError instead of a clean ValueError at load, during an offline
+    developer-run conversion or build step, not a running multi-tenant request path.
+    No documented claim that TRT-LLM safely loads untrusted checkpoints, and
+    model-conversion tooling is treated as trusted input across the ecosystem, so
+    this is recorded as a robustness non-finding by the implicit threat model, not a
+    vulnerability. A one-line hardening (validate num_attention_heads greater than 0
+    and raise a clear error) would fix it, held for possible future private report.
+  severity: low
+  status: active
+  refs: [docs/THREAT-MODEL.md]

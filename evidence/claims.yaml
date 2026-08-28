@@ -1148,3 +1148,39 @@ claims:
   severity: low
   status: active
   refs: [docs/THREAT-MODEL.md]
+
+# ---- vLLM skip-tokenizer-init allowed_token_ids vocab-check gap: robustness observation ----
+- id: C-0026
+  date: 2026-08-28
+  target: vllm
+  entry_point: SamplingParams _validate_allowed_token_ids and gpu_input_batch mask build
+  statement: >
+    In vLLM 0.28.0 the allowed_token_ids vocab-bounds check is gated on a tokenizer
+    being present, so when tokenizer is None (skip-tokenizer-init mode) an
+    out-of-vocab token id passes validation, and the mask-build fancy-index would
+    raise IndexError on that id. In normal tokenizer-present deployments this is
+    fully defended. Remote reachability in skip-tokenizer-init mode is unconfirmed.
+    Low severity, non-default mode, DoS ceiling.
+  kind: non-finding
+  confidence: verified
+  provenance:
+    - executed sampling_params _validate_allowed_token_ids with tokenizer None passed an out-of-vocab id 999999999 with no rejection, in vllm 0.28.0
+    - executed the same validator with a tokenizer present and it raised VLLMValidationError rejecting the out-of-vocab id, confirming the defended path
+    - reproduced the gpu_input_batch operation mask req_index indexed by the id equals False on a bool tensor of width 151936, which raised IndexError index 999999999 out of bounds
+    - source-read completion serving.py line 176 to_sampling_params is called with no tokenizer and no verify call in that path, so verification is deferred to the engine where tokenizer is None under skip-tokenizer-init
+  observation: >
+    Confirmed empirically in-process that the vocab check is skipped when tokenizer
+    is None and that the downstream fancy-index raises IndexError. Did not confirm
+    whether the OpenAI server routes a request allowed_token_ids to that path in
+    skip-tokenizer-init mode, full-server testing was blocked by WSL2 lacking UVA
+    so the live request path could not be exercised on this host.
+  boundary: >
+    Requires the non-default --skip-tokenizer-init deployment mode. Normal
+    deployments pass a real tokenizer and are defended, confirmed. Severity ceiling
+    DoS (IndexError), not memory corruption. Blast radius (per-request vs worker)
+    and remote reachability both unconfirmed. Recorded as a low-severity robustness
+    observation, the durable fix is to make the vocab check unconditional rather
+    than gated on tokenizer presence. Not claimed as a remote vulnerability.
+  severity: low
+  status: active
+  refs: [docs/THREAT-MODEL.md, docs/LESSONS.md]

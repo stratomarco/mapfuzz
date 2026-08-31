@@ -87,12 +87,13 @@ jobs:
           fi
           echo "no divergence (fast/slow agree)"
       - name: Upload artifacts
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: differential-artifacts
           path: targets/tokenizers_differential/artifacts/
           if-no-files-found: ignore
+          retention-days: 14
 
   config-fuzz:
     runs-on: ubuntu-latest
@@ -140,12 +141,13 @@ jobs:
           # triage exits 1 if a real bucket exists -> fails the job
           python3 -m chassis.triage reports/
       - name: Upload artifacts
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: config-fuzz-artifacts
           path: targets/transformers_config/artifacts/
           if-no-files-found: ignore
+          retention-days: 14
 
   # Heavy native fuzzing. GGUF clones and builds llama.cpp at a pinned commit;
   # runs only its public fuzz-blockers. Allowed to be slower/flakier than the
@@ -189,7 +191,7 @@ jobs:
           done
           python3 -m chassis.triage reports/
       - name: Upload artifacts
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v5
         with:
           name: gguf-fuzz-artifacts
@@ -197,3 +199,4 @@ jobs:
             targets/gguf/artifacts/
             targets/gguf/run.log
           if-no-files-found: ignore
+          retention-days: 14

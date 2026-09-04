@@ -466,7 +466,7 @@
 - refs: docs/M0-baseline-audit.md, PRIVATE_findings
 
 ### C-0049  (verified | severity: none | status: active)
-**The vLLM serving layer defends the sampling-parameter token-id seam. Request fields that become indices into the logits or vocab are validated against vocab size in a model-aware pass before the engine uses them, so a well-formed but out-of-vocab token id from a request does not reach an unbounded tensor index.**
+**In tokenizer-present mode, the vLLM serving layer defends the sampling-parameter token-id seam. Request fields that become indices into the logits or vocab are validated against vocab size in a model-aware pass before the engine uses them, so a well-formed but out-of-vocab token id does not reach an unbounded tensor index. This holds only when a tokenizer is present. C-0026 records the confirmed exception, in skip-tokenizer-init mode the vocab check is skipped, which is a separate low-severity observation.**
 
 - target: vllm / SamplingParams verify and v1 sampler token-id application
 - date: 2026-08-19
@@ -475,7 +475,7 @@
   - source-read v1 sample ops bad_words.py applies the mask via a slice assignment logits last_token_id to last_token_id plus 1, which clamps silently and cannot go out of bounds
   - source-read gpu_input_batch.py builds allowed_token_ids_mask sized to vocab_size, and the raw ids reaching the fancy-index are gated by the model-aware validator upstream
 - observation: Traced the token-id-as-index seam through three consumers. The bad_words path is safe by slice-clamp semantics. The allowed_token_ids path is guarded by a deferred model-aware validator that runs once vocab is known, the correct place for a check the request layer cannot make. The second verify call site is for PoolingParams, a different parameter type, not a bypass of the SamplingParams check.
-- boundary: Scoped to the sampling-parameter token-id fields on the SamplingParams path in a current vLLM checkout. One narrow non-default thread not pursued, the vocab check is gated on tokenizer being present, so a skip-tokenizer-init deployment could in principle skip it, an unusual mode that may not expose the field. The main result extends the seam-checking pattern from file loaders into the serving runtime, vLLM defers the vocab check to where vocab is known.
+- boundary: Scoped to the sampling-parameter token-id fields on the SamplingParams path in a current vLLM checkout, tokenizer-present mode only. The tokenizer-absent gap is no longer hypothetical, C-0026 confirmed in-process that the vocab check is skipped when tokenizer is None and the mask fancy-index then raises IndexError. So this claim must be read strictly as tokenizer-present, with C-0026 as the exception. Extends the seam-checking pattern into the serving runtime for the default (tokenizer-present) path only.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
 
 ### C-0060  (verified | severity: none | status: active)

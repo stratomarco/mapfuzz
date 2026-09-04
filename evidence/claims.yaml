@@ -1067,11 +1067,13 @@ claims:
   target: vllm
   entry_point: SamplingParams verify and v1 sampler token-id application
   statement: >
-    The vLLM serving layer defends the sampling-parameter token-id seam. Request
-    fields that become indices into the logits or vocab are validated against
-    vocab size in a model-aware pass before the engine uses them, so a
-    well-formed but out-of-vocab token id from a request does not reach an
-    unbounded tensor index.
+    In tokenizer-present mode, the vLLM serving layer defends the
+    sampling-parameter token-id seam. Request fields that become indices into the
+    logits or vocab are validated against vocab size in a model-aware pass before
+    the engine uses them, so a well-formed but out-of-vocab token id does not
+    reach an unbounded tensor index. This holds only when a tokenizer is present.
+    C-0026 records the confirmed exception, in skip-tokenizer-init mode the vocab
+    check is skipped, which is a separate low-severity observation.
   kind: audit
   confidence: verified
   provenance:
@@ -1086,11 +1088,12 @@ claims:
     PoolingParams, a different parameter type, not a bypass of the SamplingParams check.
   boundary: >
     Scoped to the sampling-parameter token-id fields on the SamplingParams path in
-    a current vLLM checkout. One narrow non-default thread not pursued, the vocab
-    check is gated on tokenizer being present, so a skip-tokenizer-init deployment
-    could in principle skip it, an unusual mode that may not expose the field. The
-    main result extends the seam-checking pattern from file loaders into the serving
-    runtime, vLLM defers the vocab check to where vocab is known.
+    a current vLLM checkout, tokenizer-present mode only. The tokenizer-absent gap
+    is no longer hypothetical, C-0026 confirmed in-process that the vocab check is
+    skipped when tokenizer is None and the mask fancy-index then raises IndexError.
+    So this claim must be read strictly as tokenizer-present, with C-0026 as the
+    exception. Extends the seam-checking pattern into the serving runtime for the
+    default (tokenizer-present) path only.
   severity: none
   status: active
   refs: [docs/THREAT-MODEL.md, docs/M0-baseline-audit.md]

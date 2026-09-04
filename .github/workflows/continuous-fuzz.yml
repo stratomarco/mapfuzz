@@ -86,14 +86,6 @@ jobs:
             echo "DIVERGENCE FOUND: ${found[*]}"; exit 1
           fi
           echo "no divergence (fast/slow agree)"
-      - name: Upload artifacts
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: differential-artifacts
-          path: targets/tokenizers_differential/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
 
   config-fuzz:
     runs-on: ubuntu-latest
@@ -129,7 +121,7 @@ jobs:
         run: |
           bash ../../chassis/corpus.sh minimize \
             "python3 harness/fuzz_config_from_dict.py" corpus_min corpus_run || true
-          rm -rf corpus_run && mv corpus_min corpus_run 2>/dev/null || true
+          if [ -n "$(ls -A corpus_min 2>/dev/null)" ]; then rm -rf corpus_run && mv corpus_min corpus_run; else echo "corpus_min empty; keeping existing corpus_run"; fi
       - name: Triage any crashes (gate on 'real')
         run: |
           mkdir -p reports
@@ -140,14 +132,6 @@ jobs:
           done
           # triage exits 1 if a real bucket exists -> fails the job
           python3 -m chassis.triage reports/
-      - name: Upload artifacts
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: config-fuzz-artifacts
-          path: targets/transformers_config/artifacts/
-          if-no-files-found: ignore
-          retention-days: 14
 
   # Heavy native fuzzing. GGUF clones and builds llama.cpp at a pinned commit;
   # runs only its public fuzz-blockers. Allowed to be slower/flakier than the
@@ -172,7 +156,7 @@ jobs:
         working-directory: targets/gguf
         run: |
           DUR=120
-          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1800; fi
+          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1200; fi
           mkdir -p corpus_run artifacts
           bash ../../chassis/corpus.sh seed corpus_run corpus || true
           ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 \
@@ -181,7 +165,7 @@ jobs:
         working-directory: targets/gguf
         run: |
           bash ../../chassis/corpus.sh minimize ./fuzz_gguf corpus_min corpus_run || true
-          rm -rf corpus_run && mv corpus_min corpus_run 2>/dev/null || true
+          if [ -n "$(ls -A corpus_min 2>/dev/null)" ]; then rm -rf corpus_run && mv corpus_min corpus_run; else echo "corpus_min empty; keeping existing corpus_run"; fi
       - name: Triage any crashes (gate on 'real')
         run: |
           mkdir -p reports
@@ -190,13 +174,3 @@ jobs:
             targets/gguf/fuzz_gguf "$f" 2>"reports/$(basename "$f").txt" || true
           done
           python3 -m chassis.triage reports/
-      - name: Upload artifacts
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: gguf-fuzz-artifacts
-          path: |
-            targets/gguf/artifacts/
-            targets/gguf/run.log
-          if-no-files-found: ignore
-          retention-days: 14

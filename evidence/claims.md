@@ -53,8 +53,8 @@
   - machine-run:libFuzzer+ASan crash; deterministic PoC ~2000 nesting levels
   - machine-run:stack-size test (ulimit -s 65536 -> no crash) confirms depth-driven
 - observation: ASan stack-overflow; trace cycles parseExpression..parseBracedExpressionOrArray. Does not crash ~400 levels at 8MB stack; reliably crashes ~2000. Raising stack stops a given input crashing (depth-driven, not fixed-offset).
-- boundary: DoS via stack exhaustion; SIGSEGV is not a controllable write, no code-execution claim. Threshold is stack-size dependent, not a fixed count.
-- refs: PRIVATE_findings/0004-minja-parser-recursion-dos.md
+- boundary: DoS via stack exhaustion; SIGSEGV is not a controllable write, no code-execution claim. Threshold is stack-size dependent, not a fixed count. Disclosure: submitted as public PR google/minja#92 (open, blocked on the Google CLA since 2026-08-14, no review yet). This recursion DoS was also independently disclosed publicly by another researcher (neimasilk, huntr PoC for the same parser recursion class), so it is public prior art, not a novel finding to claim. llama.cpp is separately migrating off minja to a new jinja engine, reducing downstream impact.
+- refs: https://github.com/google/minja/pull/92
 
 ### C-0011  (verified | severity: medium-low | status: reported)
 **minja performs integer division and modulo with no zero-divisor check at multiple sites; a zero divisor crashes the process with SIGFPE (finding 0005).**
@@ -67,8 +67,8 @@
   - machine-run:libFuzzer render campaign, {{ 1/0 }} and {{ 57%0 }}
   - machine-run:NON-sanitized -O2 build, exit 136 (SIGFPE), not sanitizer-only
 - observation: {{ 1/0 }}, {{ 57%0 }}, {{ 5//0 }} all -> "Floating point exception" exit 136 in a non-sanitized -O2 build. Controls {{ 10%3 }}->1, {{ 5/2 }}->2 OK. Five unguarded integer div/mod sites across two implementations.
-- boundary: DoS via SIGFPE; not memory corruption, no code-execution claim. Scope corrected to multiple sites after a deeper campaign (see C-0012).
-- refs: PRIVATE_findings/0005-minja-division-by-zero.md
+- boundary: DoS via SIGFPE; not memory corruption, no code-execution claim. Scope corrected to multiple sites after a deeper campaign (see C-0012). Disclosure: submitted as public PR google/minja#92 (open, blocked on the Google CLA since 2026-08-14). The PR describes the triggers openly, so this is not embargoed and no reproducer is withheld. No independent public disclosure of this specific div/mod SIGFPE was found, so it may still be novel, but llama.cpp is migrating off minja, reducing downstream impact.
+- refs: https://github.com/google/minja/pull/92
 
 ### C-0013  (verified | severity: low | status: reported)
 **llama.cpp's mmproj loader scalar getters (get_bool/i32/u32/f32/string) check key presence but not GGUF type before the typed accessor, which GGML_ASSERTs on mismatch and aborts (SIGABRT). A wrong-typed hparam key aborts any loader (finding 0006).**

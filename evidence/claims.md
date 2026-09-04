@@ -1,7 +1,7 @@
 # mapfuzz Research Evidence Base (rendered)
 
 > Generated from claims.yaml by evidence/tool.py. Do not edit by hand.
-> 43 claims.
+> 44 claims.
 
 ## Findings (real defects)
 
@@ -490,6 +490,21 @@
 - observation: Deliberately hunted memory corruption rather than DoS at the two highest-risk spots in a mature serving runtime, the shape-size arithmetic and the shared-memory offset-plus-size path. Both apply the overflow-safe formulation, with a comment showing the overflow was consciously considered. The shared memory path is the single most likely out-of-bounds source in a serving runtime and it is closed.
 - boundary: Scoped to the request-path size arithmetic and shared-memory bounds in a current Triton checkout. The model repository remains trusted by NVIDIA's documented threat model and was not treated as an attack surface. The result extends the maintained-core-hardened finding to the memory-corruption tier on a serving runtime, both DoS-class and overflow-class seams are defended.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
+
+### C-0061  (verified | severity: none | status: active)
+**The NVIDIA Isaac-GR00T policy server's untrusted network deserialization boundary is defended against the pickle-execution, unpack-bomb, and declared-shape-versus-actual-bytes classes. Reached over ZMQ before token validation, so it is an unauthenticated parse surface, but the parser it exposes rejects every malformed-amplification input tested.**
+
+- target: nvidia_groot / gr00t/policy/server_client.py MsgSerializer.from_bytes and the ZMQ run loop
+- date: 2026-08-28
+- provenance:
+  - source-read server_client.py MsgSerializer._safe_decode blocks object-dtype ndarray payloads two ways and uses np.load with allow_pickle False, closing the pickle-execution path deliberately
+  - machine-run msgpack 1.1.0 unpackb rejects a 5-byte array32 header declaring 4.29e9 elements with ValueError exceeds max_array_len tied to buffer size, same for map32
+  - machine-run np.load allow_pickle False on a crafted NPY header declaring a huge shape with no data raises ValueError EOF reading array data before completing allocation, and a 7.28 TiB shape raises a catchable MemoryError
+  - machine-run msgpack-numpy 0.4.8 mnp.decode uses frombuffer which raises TypeError buffer is too small when declared shape exceeds actual data bytes
+  - source-read server_client.py run loop wraps the handler in except Exception, so a MemoryError from a huge declared shape is caught and returned as an error rather than crashing the server
+- observation: Probed the sharpest frontier target of the session, a network-facing, unauthenticated, model-free-testable robot policy server. The token is inside the msgpack payload so auth is necessarily checked after from_bytes, making the deserializer an unauthenticated surface. Both array-reconstruction paths (NVIDIA's np.load path and msgpack-numpy's frombuffer path) validate declared shape against actual data length and reject mismatches. Tested in-process against the exact from_bytes entry point with no model and no GPU (ReplayPolicy is documented as model-free, and the serializer imports without CUDA).
+- boundary: Scoped to the deserialization and dispatch boundary in a current Isaac-GR00T checkout, tested in-process against the from_bytes function and the underlying msgpack, numpy, and msgpack-numpy behavior. Not tested, live-server timing or ZMQ state-machine behavior, and the get_action handler internals behind a real or replay policy. The unauthenticated-parse structural point is noted, no reachable amplification or code-execution was found through it. Extends the maintained-core-hardened result into robotics and Physical AI infrastructure.
+- refs: docs/FRONTIER.md, docs/THREAT-MODEL.md
 
 ## Methods (lessons)
 

@@ -14,7 +14,7 @@ claims:
     A malformed decoder field causes a panic (process abort) at
     decoders/mod.rs:90 via .expect() on an untrusted deserialize (finding 0002).
   kind: finding
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:tokenizers/src/decoders/mod.rs:90
     - sandbox-run:cargo-fuzz + Atheris harness, minimized 23-byte reproducer
@@ -173,7 +173,7 @@ claims:
     when the state's type does not match the target; a robustness nit, NOT a
     security finding.
   kind: non-finding
-  confidence: verified
+  confidence: inferred
   provenance:
     - sandbox-run:200k inputs, all ~147 flagged cases dedup to one .keys() site
     - source-read:from_state_dict dict handler calls .keys() without type check
@@ -346,7 +346,7 @@ claims:
     Mainstream ML format parsers are saturated in OSS-Fuzz; mapfuzz's open ground
     is newer/smaller loaders and cross-cutting bug classes.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:OSS-Fuzz project.yaml present for numpy/hdf5/h5py/keras/tf/onnx/safetensors/sentencepiece
     - source-read:numpy fuzz_binary_loader (.npy/.npz), keras fuzz_serialization (deserialize_keras_object RCE surface)
@@ -368,7 +368,7 @@ claims:
     minja (llama.cpp's C++ chat-template engine) is unfuzzed and is a real
     download-to-load-to-execute trust boundary.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:OSS-Fuzz jinja2 present (200) but minja/consumers absent (404)
     - source-read:no fuzzer in google/minja repo
@@ -640,7 +640,7 @@ claims:
     passthrough for internal host callbacks, with no defended trust boundary
     (pickle executes code by design).
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:pickle_util.py loads() = cloudpickle.loads(data)
     - source-read:OSS-Fuzz jax/jaxlib/cloudpickle all 404 (unfuzzed) but no defended boundary
@@ -691,7 +691,7 @@ claims:
     project membership. llama.cpp IS in OSS-Fuzz, but its targets do not cover the
     clip/mmproj loader, which was the real gap and yielded two findings.
   kind: method
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:OSS-Fuzz projects/llamacpp/build.sh target list (fuzz_grammar, fuzz_json_to_grammar, fuzz_apply_template, fuzz_load_model, fuzz_inference, fuzz_structured)
     - claim:C-0013
@@ -755,7 +755,7 @@ claims:
     same repo rejects cleanly while the Python reference reader hangs; the C++
     defenses have no Python equivalent.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:ggml/src/gguf.cpp gguf_read_emplace_helper returns false on short read; catches std::length_error and std::bad_alloc
     - source-read:gguf-py/gguf/gguf_reader.py ARRAY branch has no bound, no alloc guard, no short-read termination
@@ -839,7 +839,7 @@ claims:
     against the path-traversal class: a repo-controlled filename is validated
     before use and the joined path is containment-checked against the snapshot dir.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read:_local_folder.py:199 _validate_relative_filename rejects '..' segments, absolute/root, Windows drive, drive-relative, and UNC paths, checked under BOTH PurePosixPath and PureWindowsPath rules cross-OS
     - source-read:file_download.py:1067 validator called before path use; :2056 _get_pointer_path raises if abspath(pointer) is not under abspath(snapshot_path)
@@ -903,7 +903,7 @@ claims:
     -1 or a positive value, so a downloaded quantize_config.json cannot drive a
     div-by-zero from a zero bits or zero group_size into the pack and unpack math.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read config.py line 2705 rejects group_size that is not -1 and is not positive
     - source-read config.py lines 2622 to 2634 validate bits against the supported width set with a raise
@@ -936,7 +936,7 @@ claims:
     refuses compressed entries and reads by offset without disk extraction, and the
     gptqmodel machete downloader uses the safe tar extraction filter.
   kind: negative
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read huggingface_hub _dduf.py line 136 rejects any entry whose compress_type is not ZIP_STORED, so no decompression bomb, and it reads entries by mmap offset rather than extracting to disk, so no zip-slip
     - source-read huggingface_hub _dduf.py _validate_dduf_entry_name enforces an allowlist of extensions, rejects backslash separators, and allows at most one directory level
@@ -969,7 +969,7 @@ claims:
     well-formed are re-checked for semantic safety by the consumer before use as
     divisors, sizes, or per-layer array lengths.
   kind: negative
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read llama-model.cpp line 1109 asserts n_layer_all is greater than 0 and at most LLAMA_MAX_LAYERS
     - source-read llama-model.cpp line 1208 guards the n_embd over n_head division behind a check that n_head is greater than 0, and llama-hparams.cpp line 78 guards n_head_kv equal to 0
@@ -1038,7 +1038,7 @@ claims:
     the hardened gguf_init_from_file parser, and the vector helper is constrained
     to F32 so its byte count is always 4-aligned.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read clip.cpp line 3505 num_bytes is ggml_nbytes(cur) from the allocated tensor, and line 3506 reads that exact size into cur->data, with the temp-buffer branch resizing to match
     - source-read clip.cpp line 3499 to 3502 the seek is error-checked before the read
@@ -1075,7 +1075,7 @@ claims:
     C-0026 records the confirmed exception, in skip-tokenizer-init mode the vocab
     check is skipped, which is a separate low-severity observation.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read sampling_params.py _validate_allowed_token_ids rejects any id that is negative or at least vocab_size, called from verify with the tokenizer on the SamplingParams path in input_processor.py line 97
     - source-read v1 sample ops bad_words.py applies the mask via a slice assignment logits last_token_id to last_token_id plus 1, which clamps silently and cannot go out of bounds
@@ -1110,7 +1110,7 @@ claims:
     checks byte_size against SIZE_MAX minus offset before adding, then bounds the
     result against the registered region size.
   kind: audit
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read model_config.h GetElementCount checks cnt greater than INT64_MAX over dim before each multiply and returns an overflow sentinel, and handles wildcard and negative dims
     - source-read model_config.h GetByteSize checks cnt greater than INT64_MAX over dt_size before the element-times-dtype multiply and propagates the overflow sentinel
@@ -1145,7 +1145,7 @@ claims:
     not a security finding, checkpoint loading is a trusted-input offline build
     step per the documented conversion workflow.
   kind: non-finding
-  confidence: verified
+  confidence: inferred
   provenance:
     - source-read modeling_utils.py line 447 head_size = hidden_size floordiv num_attention_heads with no positivity check anywhere in __init__
     - source-read modeling_utils.py from_json_file line 511 json.load then from_dict, from_dict line 496 config_cls of the file dict as kwargs, from_checkpoint line 526 loads config.json by the same path

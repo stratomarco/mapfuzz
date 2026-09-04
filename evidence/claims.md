@@ -5,7 +5,7 @@
 
 ## Findings (real defects)
 
-### C-0001  (verified | severity: low | status: reported)
+### C-0001  (inferred | severity: low | status: reported)
 **A malformed decoder field causes a panic (process abort) at decoders/mod.rs:90 via .expect() on an untrusted deserialize (finding 0002).**
 
 - target: tokenizers / Tokenizer::from_str / from_bytes
@@ -127,7 +127,7 @@
 
 ## Non-findings (deliberately not counted)
 
-### C-0020  (verified | severity: none | status: active)
+### C-0020  (inferred | severity: none | status: active)
 **from_state_dict raises a raw AttributeError (not flax's SerializationError) when the state's type does not match the target; a robustness nit, NOT a security finding.**
 
 - target: flax_checkpoint / from_state_dict
@@ -190,7 +190,7 @@
 - boundary: NOT a DoS and much weaker than 0008: RecursionError is caller-catchable and fast-failing, no unbounded resource use, no corruption (contrast 0008's unbounded hang). It is an uncaught-unexpected-exception-type robustness gap, same class as the LeRobot from_dict nit (C-0022). The reader should reject nested/over-deep arrays with a clean ValueError like its n_dims/alignment guards. Low severity; recorded for completeness, no report warranted on its own.
 - refs: docs/M0-baseline-audit.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
-### C-0025  (verified | severity: low | status: active)
+### C-0025  (inferred | severity: low | status: active)
 **TensorRT-LLM computes head_size as hidden_size floor-divided by num_attention_heads without validating that num_attention_heads is positive. A checkpoint config.json with num_attention_heads set to 0 reaches the division and raises ZeroDivisionError on load. This is a low-severity robustness gap, not a security finding, checkpoint loading is a trusted-input offline build step per the documented conversion workflow.**
 
 - target: tensorrt_llm / PretrainedConfig __init__ via from_checkpoint and from_json_file
@@ -319,7 +319,7 @@
 - boundary: Scoped to the tensor-info parse and size computation. The finding on this component is 0008 (KV array-length loop); the tensor path itself is hardened. Actual tensor-data dequantization on adversarial bytes was not separately fuzzed; numpy reshape strictness makes size-mismatch a clean error, but a dedicated dequant campaign is future depth.
 - refs: docs/M0-baseline-audit.md
 
-### C-0038  (verified | severity: none | status: active)
+### C-0038  (inferred | severity: none | status: active)
 **A sweep for the decompression-bomb and zip-slip class across the download and container-handling paths of the maintained loaders found them defended. DDUF refuses compressed entries and reads by offset without disk extraction, and the gptqmodel machete downloader uses the safe tar extraction filter.**
 
 - target: project / decompression call sites across huggingface_hub, gptqmodel, llama.cpp tooling
@@ -332,7 +332,7 @@
 - boundary: Scoped to the decompression sites reachable in the download and container paths of these maintained libraries. One narrow defense-in-depth nit noted and not counted as a finding: machete on Python 3.11 and earlier extracts without the filter, but only from a trusted pinned URL and only on old Python, a stacked precondition well below the finding bar. The broader lesson is that maintained central code is consistently hardened on the classes tested this session.
 - refs: docs/M0-baseline-audit.md
 
-### C-0039  (verified | severity: none | status: active)
+### C-0039  (inferred | severity: none | status: active)
 **The GGUF-metadata to llama.cpp-consumer composition boundary is defended, including cross-field consistency. Values that a GGUF parser accepts as well-formed are re-checked for semantic safety by the consumer before use as divisors, sizes, or per-layer array lengths.**
 
 - target: llama_cpp_consumer / llama-model.cpp hparam load and llama-model-loader.cpp get_key_or_arr
@@ -347,7 +347,7 @@
 
 ## Audits (scope / M0)
 
-### C-0040  (verified | status: active)
+### C-0040  (inferred | status: active)
 **Mainstream ML format parsers are saturated in OSS-Fuzz; mapfuzz's open ground is newer/smaller loaders and cross-cutting bug classes.**
 
 - target: project
@@ -359,7 +359,7 @@
 - boundary: "Saturated" means those specific surfaces are continuously fuzzed by others; does not mean they are bug-free, only that re-fuzzing duplicates professional work. Open-ground list is as of this date; OSS-Fuzz onboards over time.
 - refs: docs/M0-baseline-audit.md
 
-### C-0041  (verified | status: active)
+### C-0041  (inferred | status: active)
 **minja (llama.cpp's C++ chat-template engine) is unfuzzed and is a real download-to-load-to-execute trust boundary.**
 
 - target: minja
@@ -372,7 +372,7 @@
 - boundary: Establishes the target is open and the boundary is real. Yielded two findings (C-0010, C-0011). Does not establish the interpreter is memory-unsafe (see the ongoing render campaign).
 - refs: docs/M0-baseline-audit.md, targets/minja_template/
 
-### C-0042  (verified | severity: none | status: active)
+### C-0042  (inferred | severity: none | status: active)
 **jax._src.pickle_util was evaluated and declined: it is a thin cloudpickle.loads passthrough for internal host callbacks, with no defended trust boundary (pickle executes code by design).**
 
 - target: jax / jax._src.pickle_util.loads
@@ -398,7 +398,7 @@
 - boundary: Reproducers un-embargo on PR merge, not before. C-0010/0011/0012 status flipped embargoed -> reported on this basis.
 - refs: PRIVATE_findings/minja-0004-0005-DISCLOSURE-REPORT.md
 
-### C-0044  (verified | status: active)
+### C-0044  (inferred | status: active)
 **For the same untrusted array-length input, the C++ GGUF reference reader in the same repo rejects cleanly while the Python reference reader hangs; the C++ defenses have no Python equivalent.**
 
 - target: gguf_py_reader / gguf_read_emplace_helper (C++) vs _get_field_parts (Python)
@@ -411,7 +411,7 @@
 - boundary: Establishes finding 0008 as a concrete cross-impl inconsistency, not expected behaviour. Lesson: a project's reference/secondary implementation may be weaker than its production one; fuzz the reference impl, not only the primary.
 - refs: docs/LESSONS.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
-### C-0045  (verified | severity: none | status: active)
+### C-0045  (inferred | severity: none | status: active)
 **huggingface_hub's download path-construction boundary is properly defended against the path-traversal class: a repo-controlled filename is validated before use and the joined path is containment-checked against the snapshot dir.**
 
 - target: huggingface_hub / hf_hub_download / _validate_relative_filename / _get_pointer_path
@@ -424,7 +424,7 @@
 - boundary: Defended boundary; not a productive fuzz target for input-driven traversal. One deliberate design note: _get_pointer_path uses os.path.abspath (lexical) not resolve() (symlink-following) for the containment check, a documented tradeoff; a symlink-based escape would require pre-existing attacker write access to the cache, which is out of this threat model. Recorded as a mapping of what is solid, mirrors the pytorch/GGUF negatives. Pivot to a softer surface.
 - refs: docs/M0-baseline-audit.md
 
-### C-0046  (verified | severity: none | status: active)
+### C-0046  (inferred | severity: none | status: active)
 **gptqmodel validates the quantize-config fields that feed downstream size and bit arithmetic. bits must resolve to a supported width, and group_size must be -1 or a positive value, so a downloaded quantize_config.json cannot drive a div-by-zero from a zero bits or zero group_size into the pack and unpack math.**
 
 - target: gptqmodel / QuantizeConfig __post_init__ validation
@@ -451,7 +451,7 @@
 - boundary: NOT a novel finding. Recorded as prior art and as method validation. The composition angle independently converged on the seam that produced four CVEs, which corroborates that trust-boundary composition is where serious ML supply chain bugs live. Popular libraries diffusers and transformers are now actively researched for this class, so novel work in it should target quieter component pairs or a different bug class such as native memory corruption.
 - refs: docs/RELATED-WORK.md, docs/THREAT-MODEL.md
 
-### C-0048  (verified | severity: none | status: active)
+### C-0048  (inferred | severity: none | status: active)
 **The clip mmproj C++ tensor-loading path is defended against the overflow and out-of-bounds class. Read sizes are derived from the allocated tensor via ggml_nbytes rather than from file-controlled values, tensor offsets come from the hardened gguf_init_from_file parser, and the vector helper is constrained to F32 so its byte count is always 4-aligned.**
 
 - target: clip_mmproj / tools/mtmd/clip.cpp tensor data load loop
@@ -465,7 +465,7 @@
 - boundary: Scoped to the tensor read path in a current llama.cpp checkout. The clip findings are 0006 and 0007 on the metadata path (found, PR 27202). The tensor path is defended. One low-severity residual noted and not a finding, a short read past EOF could leave an uninitialized tail in a tensor buffer, but the read size matches the allocation so there is no overflow. CVE-tier memory corruption not present on this surface.
 - refs: docs/M0-baseline-audit.md, PRIVATE_findings
 
-### C-0049  (verified | severity: none | status: active)
+### C-0049  (inferred | severity: none | status: active)
 **In tokenizer-present mode, the vLLM serving layer defends the sampling-parameter token-id seam. Request fields that become indices into the logits or vocab are validated against vocab size in a model-aware pass before the engine uses them, so a well-formed but out-of-vocab token id does not reach an unbounded tensor index. This holds only when a tokenizer is present. C-0026 records the confirmed exception, in skip-tokenizer-init mode the vocab check is skipped, which is a separate low-severity observation.**
 
 - target: vllm / SamplingParams verify and v1 sampler token-id application
@@ -478,7 +478,7 @@
 - boundary: Scoped to the sampling-parameter token-id fields on the SamplingParams path in a current vLLM checkout, tokenizer-present mode only. The tokenizer-absent gap is no longer hypothetical, C-0026 confirmed in-process that the vocab check is skipped when tokenizer is None and the mask fancy-index then raises IndexError. So this claim must be read strictly as tokenizer-present, with C-0026 as the exception. Extends the seam-checking pattern into the serving runtime for the default (tokenizer-present) path only.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
 
-### C-0060  (verified | severity: none | status: active)
+### C-0060  (inferred | severity: none | status: active)
 **Triton's request-path memory-corruption seams are defended with explicit overflow guards. The shape-to-bytes multiply checks each product against INT64_MAX before multiplying, and the shared-memory offset-plus-byte-size path checks byte_size against SIZE_MAX minus offset before adding, then bounds the result against the registered region size.**
 
 - target: triton / shape-size math GetElementCount and GetByteSize, and shared-memory GetMemoryInfo
@@ -569,7 +569,7 @@
 - boundary: The patched dependency is for hunting only; reproduction/confirmation for a report must use pristine upstream. Keep the two headers distinct.
 - refs: docs/LESSONS.md
 
-### C-0055  (verified | status: active)
+### C-0055  (inferred | status: active)
 **M0 must check a project's actual OSS-Fuzz build.sh fuzz-target LIST, not just project membership. llama.cpp IS in OSS-Fuzz, but its targets do not cover the clip/mmproj loader, which was the real gap and yielded two findings.**
 
 - target: project

@@ -96,7 +96,7 @@
 - boundary: DoS (resource exhaustion); no memory corruption or code execution. Submitted upstream in the same PR as 0006. Reproducers embargoed until PR merges.
 - refs: PRIVATE_findings/0007-clip-mmproj-block-count-alloc-dos.md
 
-### C-0015  (verified | severity: low | status: embargoed)
+### C-0015  (verified | severity: low | status: reported)
 **gguf-py's Python GGUFReader loops range(alen) over an untrusted uint64 array length with no bound, no allocation guard, and no EOF-based termination, so a 49-byte crafted GGUF (array length 2^64-1) causes unbounded time/memory (finding 0008).**
 
 - target: gguf_py_reader / GGUFReader / _get_field_parts (ARRAY branch)
@@ -107,7 +107,7 @@
   - machine-run:GGUFReader(poc) times out at 5s (exit 124), DoS confirmed
   - machine-run:_get past EOF returns short reads without raising, so the loop does not break
 - observation: A KV field of type ARRAY (9) with a huge declared length drives an unbounded loop building growing Python lists. _get slices the mmap and returns short/empty arrays past EOF without raising (asked 4 uint32 past EOF, got 1, no exception), so the loop spins the full declared count. End-to-end timeout confirmed on a 49-byte input.
-- boundary: DoS only (resource exhaustion); Python is memory-safe, no corruption or code execution. Root-caused to the single ARRAY-branch site. Reproducer/generator embargoed (PRIVATE_findings/poc_0008_gen.py) until coordinated disclosure to ggml-org/llama.cpp. Cross-impl: C++ reference reader guards this exact case (see C-0044).
+- boundary: DoS only (resource exhaustion); Python is memory-safe, no corruption or code execution. Root-caused to the single ARRAY-branch site. Cross-impl: C++ reference reader guards this exact case (see C-0044). Disclosure: ggml-org's security policy treats DoS case-by-case and generally not as a vulnerability, and its private disclosure program is disabled, so this is handled as a public PR with a fix and regression test rather than a private embargo. Upstream may decline it as won't-fix under that policy. Technical detail for this DoS is already public in this repo, consistent with the public-PR handling. Earlier records labeled this embargoed, that framing was incorrect for this project's DoS policy and is corrected here.
 - refs: PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
 ## Corrections

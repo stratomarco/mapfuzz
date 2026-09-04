@@ -721,12 +721,17 @@ claims:
     49-byte input.
   boundary: >
     DoS only (resource exhaustion); Python is memory-safe, no corruption or code
-    execution. Root-caused to the single ARRAY-branch site. Reproducer/generator
-    embargoed (PRIVATE_findings/poc_0008_gen.py) until coordinated disclosure to
-    ggml-org/llama.cpp. Cross-impl: C++ reference reader guards this exact case
-    (see C-0044).
+    execution. Root-caused to the single ARRAY-branch site. Cross-impl: C++
+    reference reader guards this exact case (see C-0044). Disclosure: ggml-org's
+    security policy treats DoS case-by-case and generally not as a vulnerability,
+    and its private disclosure program is disabled, so this is handled as a public
+    PR with a fix and regression test rather than a private embargo. Upstream may
+    decline it as won't-fix under that policy. Technical detail for this DoS is
+    already public in this repo, consistent with the public-PR handling. Earlier
+    records labeled this embargoed, that framing was incorrect for this project's
+    DoS policy and is corrected here.
   severity: low
-  status: embargoed
+  status: reported
   refs: [PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md]
 
 # ---- cross-impl asymmetry audit (C++ guards it, Python does not) ----

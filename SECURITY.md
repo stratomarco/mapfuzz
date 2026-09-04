@@ -12,4 +12,10 @@ Live crash reproducers and unpublished finding writeups live in a gitignored `PR
 
 ## Reporting a vulnerability in this project
 
-If you find a defect in the harnesses, build scripts, or CI configuration of this project itself, open a private report to the maintainer rather than a public issue.
+If you find a defect in the harnesses, build scripts, or CI configuration of this project itself, report it privately rather than opening a public issue.
+
+Preferred route: use GitHub Private Vulnerability Reporting. Go to the repository Security tab and choose "Report a vulnerability", which opens a private advisory visible only to the maintainer.
+
+Fallback: email maconstantino@gmail.com.
+
+Please include what to reproduce, the affected revision, and the expected versus observed behavior. This project follows coordinated disclosure: reproducers are treated as unpublished exploits and are withheld publicly until a fix ships or an embargo lapses.

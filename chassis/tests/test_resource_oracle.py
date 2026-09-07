@@ -35,11 +35,25 @@ class ResourceTests(unittest.TestCase):
         self.assertEqual(run_capped(long_error, b"")[0], REJECTED)
 
     def test_real_json_loader(self):
-        # Actual stdlib parser, synthetic nesting family; no third-party safety claim.
+        # Deterministic syntax rejection, independent of recursion thresholds.
         self.assertEqual(run_capped(json.loads, b'{"count":4}')[0], OK)
+        for malformed in (b'{"count":', b'[1,]', b'{'):
+            with self.subTest(malformed=malformed):
+                outcome, detail = run_capped(json.loads, malformed)
+                self.assertEqual(outcome, REJECTED)
+                self.assertTrue(detail.startswith("JSONDecodeError:"), detail)
+
+    def test_nested_json_stays_within_caps(self):
+        # These are valid JSON inputs. Python versions can accept or reject
+        # different depths; either is resource-bounded. Do not weaken the
+        # separate assert_guards_class hostile-input rejection policy.
         for depth in (2000, 4000, 8000):
-            bomb = b"[" * depth + b"0" + b"]" * depth
-            self.assertEqual(run_capped(json.loads, bomb)[0], REJECTED)
+            with self.subTest(depth=depth):
+                nested = b"[" * depth + b"0" + b"]" * depth
+                outcome, detail = run_capped(json.loads, nested)
+                self.assertIn(outcome, (OK, REJECTED), (outcome, detail))
+                if outcome == REJECTED:
+                    self.assertTrue(detail.startswith("RecursionError:"), detail)
 
 
 if __name__ == "__main__":

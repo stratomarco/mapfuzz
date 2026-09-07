@@ -70,3 +70,16 @@ Arbitrary unknown exit-zero log text cannot universally be identified as a fault
 A target must satisfy the exit/artifact contract before promotion. Source-location
 triage can merge root causes and requires manual investigation. No long research
 campaign or whole-component safety conclusion is part of this implementation.
+
+## Follow-up: Python-version portability
+
+The first GitHub infrastructure run failed the JSON nesting test on Python
+3.12.11. The same failure was reproduced locally on Python 3.12.13: valid nested
+JSON can return normally where Python 3.10 raises RecursionError. The initial
+test incorrectly required rejection at fixed nesting depths.
+
+The corrected tests require JSONDecodeError for malformed syntax, and either
+normal completion or RecursionError within caps for the valid nesting family.
+Timeout, exhaustion, missing caps and child errors remain failures. The default
+hostile-input policy in assert_guards_class is unchanged. Infrastructure CI now
+covers both Python 3.10.12 and 3.12.11 to catch environment-dependent assumptions.

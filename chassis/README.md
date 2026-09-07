@@ -1,59 +1,25 @@
 # Chassis
 
-The reusable machinery shared across every target, as opposed to the specialized
-per-target harnesses. The chassis is what makes this a maintained tool rather
-than a collection of one-off fuzzers.
+Run capped libFuzzer/Atheris campaigns with `python3 -m chassis.campaign`.
+See [TARGETS.md](../docs/TARGETS.md#local-execution) for the command and contract.
+The runner saves logs and exit status locally. Every artifact (including unknown
+prefixes), nonzero exit, timeout or recognized diagnostic fails the run.
 
-## triage.py (C1 dedup + C2 classify)
+`python3 -m chassis.triage reports/` deduplicates by fault class and source
+location. This can merge distinct root causes at one location, so investigate
+buckets manually. `real` means worth investigating, not a verified vulnerability.
+`review` includes assertions, enum errors, arithmetic faults and exceptions.
+Every bucket and unparsed report fails the gate; missing/empty report input also
+fails. There are no allowlisted blockers. Normal campaign success is established
+by the runner, not by an empty triage directory.
 
-Collapses a pile of crash artifacts into the few DISTINCT faults they represent,
-and tags each as a likely shallow blocker, a likely real finding, or needs
-review. This codifies the manual triage done repeatedly during development (for
-example, the run that produced 14,724 artifacts that were a handful of bugs).
+The resource oracle uses a separate process with an address-space limit and
+wall-clock deadline. MemoryError is `exhausted`; timeout is independent; death
+without a message is `child-error`, not presumed OOM. A hostile input must raise
+within caps by default. `allow_bomb_ok=True` is an explicit policy for loaders
+that safely ignore a declaration. Any exception is a resource rejection, not
+proof of semantic correctness. Cap/startup failures cannot pass.
 
-It parses fault-report TEXT and is language-agnostic. Handled formats:
-AddressSanitizer, UndefinedBehaviorSanitizer, Rust panics, Python tracebacks,
-GGML_ASSERT aborts, and bare native signals.
-
-Usage:
-
-```
-# a directory of saved fault reports (one per file):
-python3 -m chassis.triage reports/
-
-# or from stdin:
-cat somefault.txt | python3 -m chassis.triage
-```
-
-Output is a frequency table: count, verdict, fault class, location, and an
-example source. Exit code is non-zero if any bucket is classified `real`, so CI
-can gate on it.
-
-### Verdicts
-
-- `real`: worth triaging as a finding. AddressSanitizer memory-safety
-  violations, native signals, and unwrap/index panics on untrusted input.
-- `shallow`: a known-cheap fault that walls the fuzzer (unvalidated enum cast,
-  assertion abort). Block it locally to fuzz deeper; see each target's
-  `fuzz-blockers/`.
-- `review`: cannot decide from the signature alone (division by zero, integer
-  overflow, generic panics, most Python exceptions). Inspect and prior-art check.
-
-The verdicts encode the judgments this project actually made: enum casts and
-asserts were the GGUF fuzz-blockers; the tokenizers `decoders/mod.rs:90` panic
-was the real finding; the GGUF division by zero was `review` and turned out to be
-a known duplicate.
-
-### Tests
-
-`python3 chassis/tests/test_triage.py` validates dedup and classification against
-fault reports captured from real runs (fixtures in `tests/fixtures/`).
-
-## Continuous layer (C3)
-
-`.github/workflows/continuous-fuzz.yml` runs a short campaign per target on every
-push and PR (and a longer nightly run), pipes crashes through triage, and fails
-the job on a `real` verdict. GGUF runs by default because its blockers are
-public. Targets with embargoed findings or blockers (tokenizers, pytorch) stay
-gated off until their findings are reported, so public CI never discloses.
-```
+CI tests malformed evidence, execution failures, artifact classes, unknown reports,
+resource outcomes and synthetic probes through the real stdlib JSON parser.
+No model-loader protection is established by the oracle self-test.

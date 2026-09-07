@@ -35,7 +35,7 @@ standing to a finding. Robust-surface maps are part of the yield.
 1. Every claim cites its provenance (method + observation), never bare assertion.
 2. Raw observations are preserved verbatim where they are load-bearing (crash
    traces, exit codes, run counts, coverage numbers).
-3. Confidence is explicit and calibrated. "Verified" requires a reproduction;
+3. Confidence is explicit and calibrated. "Verified" requires reproduction or a second source/version cross-check;
    "observed" is a single data point; "inferred" is reasoning from other claims.
 4. Every claim states its BOUNDARY: the specific thing it does not establish.
 5. Superseded claims are marked superseded with a pointer, never deleted.

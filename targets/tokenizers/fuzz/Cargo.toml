@@ -13,7 +13,7 @@ libfuzzer-sys = "0.4"
 # re-verifying the entry point in fuzz_targets/ against the new source.
 # default-features = false keeps the build light (no onig C dep, no network
 # http feature). Enabling default features widens the parse surface; see README.
-tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
+tokenizers = { version = "=0.21.4", default-features = false, features = ["fancy-regex"] }
 
 [[bin]]
 name = "from_bytes"

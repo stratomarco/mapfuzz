@@ -1,5 +1,10 @@
 # Target: GGUF
 
+Current status (2026-09-07): Paused; no_alloc metadata calibration only.
+See ../../docs/TARGETS.md. The sections below are historical research notes;
+build/run instructions require the qualification contract and must not be read
+as proof of current reproducibility or upstream coverage.
+
 ## Loader under test
 
 - Format: GGUF (the binary serialization format used to distribute quantized model weights).

@@ -4,10 +4,19 @@
 # required. Builds both fuzz_parse (parser) and fuzz_render (interpreter).
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
-DEPS=.deps
+# Historical target: supplied pins must come from a reviewed reproduction record.
+: "${MINJA_COMMIT:?Set the reviewed 40-character minja commit}"
+: "${JSON_COMMIT:?Set the reviewed 40-character nlohmann/json commit}"
+: "${MINJA_SHA256:?Set the reviewed minja.hpp sha256}"
+: "${JSON_SHA256:?Set the reviewed json.hpp sha256}"
+[[ "$MINJA_COMMIT" =~ ^[0-9a-f]{40}$ && "$JSON_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
+[[ "$MINJA_SHA256" =~ ^[0-9a-f]{64}$ && "$JSON_SHA256" =~ ^[0-9a-f]{64}$ ]] || exit 1
+DEPS=".deps/$MINJA_COMMIT-$JSON_COMMIT"
 mkdir -p "$DEPS/minja" "$DEPS/nlohmann"
-[ -f "$DEPS/minja/minja.hpp" ] || curl -fsSL "https://raw.githubusercontent.com/google/minja/main/include/minja/minja.hpp" -o "$DEPS/minja/minja.hpp"
-[ -f "$DEPS/nlohmann/json.hpp" ] || curl -fsSL "https://raw.githubusercontent.com/nlohmann/json/develop/single_include/nlohmann/json.hpp" -o "$DEPS/nlohmann/json.hpp"
+curl -fsSL "https://raw.githubusercontent.com/google/minja/$MINJA_COMMIT/include/minja/minja.hpp" -o "$DEPS/minja/minja.hpp"
+curl -fsSL "https://raw.githubusercontent.com/nlohmann/json/$JSON_COMMIT/single_include/nlohmann/json.hpp" -o "$DEPS/nlohmann/json.hpp"
+echo "$MINJA_SHA256  $DEPS/minja/minja.hpp" | sha256sum -c -
+echo "$JSON_SHA256  $DEPS/nlohmann/json.hpp" | sha256sum -c -
 FLAGS="-std=c++17 -g -O1 -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all -I$DEPS"
 clang++ $FLAGS harness/fuzz_parse.cc -o fuzz_parse
 # render: recover from div-by-zero so the campaign explores past that known bug

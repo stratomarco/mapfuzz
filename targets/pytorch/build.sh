@@ -13,9 +13,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
-TORCH_SPEC="${TORCH_SPEC:-torch}"   # e.g. TORCH_SPEC='torch==2.10.0' to pin
 
-python3 -m pip install --quiet "$TORCH_SPEC" atheris
+source ../../chassis/install_locked.sh
 
 echo "torch version under test:"
 python3 -c "import torch; print(' ', torch.__version__)"

@@ -5,13 +5,13 @@
 - Format: `tokenizer.json`, the JSON document describing a tokenizer (model, normalizer, pre-tokenizer, post-processor, decoder, vocab, merges, added tokens).
 - Implementation: huggingface/tokenizers (Rust crate `tokenizers`).
 - Entry point: `Tokenizer::from_bytes<P: AsRef<[u8]>>(bytes) -> Result<Self>`.
-- Pinned version: `tokenizers = "0.21"` (see `fuzz/Cargo.toml`).
+- Pinned version: `tokenizers = "=0.21.4"` (see `fuzz/Cargo.toml`).
 
 The entry point was read from `tokenizer/mod.rs:473` in the crate source, not assumed. `from_bytes` runs the full deserialization and tokenizer construction over an in-memory buffer, so the harness never touches the filesystem per input. If the pin is bumped, re-verify the signature before trusting the harness.
 
 ## M0 audit result
 
-Checked before any harness work:
+Historical check recorded 2026-08-13; refresh before a new campaign:
 
 - In-repo fuzz target: none. A fresh clone of huggingface/tokenizers contains no `fuzz/` directory and no fuzz target.
 - OSS-Fuzz: not a project. The OSS-Fuzz `projects/tokenizers/` path returns 404 (confirmed against a positive control, `sentencepiece`, which returns 200).
@@ -40,18 +40,16 @@ A panic reached from a malicious tokenizer file is a denial-of-service finding. 
 
 ## Build and run
 
-cargo-fuzz requires a nightly toolchain (for sanitizer and coverage instrumentation). `build.sh` installs nightly and cargo-fuzz if missing.
-
-```
-./build.sh
-mkdir -p fuzz/corpus/from_bytes && cp corpus/* fuzz/corpus/from_bytes/
-cargo +nightly fuzz run from_bytes -- -max_total_time=600 -rss_limit_mb=4096
-```
+The build requires an installed dated nightly (`RUST_TOOLCHAIN=nightly-YYYY-MM-DD`),
+an exact `CARGO_FUZZ_VERSION`, and a reviewed `fuzz/Cargo.lock`. It does not install
+moving global tools. The direct target pin is 0.21.4 for historical regression,
+not a claim that this is current upstream. Qualify toolchain and transitive
+resolution before promotion; see ../../docs/TARGETS.md.
 
 ## Status
 
-Scaffold complete and validated on a nightly toolchain: the harness builds against the real crate (needs the `fancy-regex` feature, which is set in `fuzz/Cargo.toml`) and runs coverage-guided campaigns. The first campaign produced one finding, tracked in `docs/FINDINGS.md` and embargoed pending disclosure (details and reproducer are local under `PRIVATE_findings/`, gitignored).
-
-To fuzz past that known finding into deeper code, a fuzz-blocker is required (patch the crate and wire it via `[patch.crates-io]` to a local checkout). Because that finding is unreported, its blocker patch is a disclosure artifact and is kept local and gitignored, not committed here. This differs from the GGUF blockers, which cover already-public bugs and are committed.
-
-Next levers, in order: seed diversity (BPE, WordPiece, Unigram, byte-level, populated normalizer and post-processor sections) and the structure-aware generator described in `grammar/NOTES.md`. A blind byte-mutation campaign from the single seed exhausts quickly once the shallowest panic is blocked.
+Regression maintenance; automatic campaigns paused. Findings 0002 and 0003 were
+reported on 2026-08-13 according to the ledger. Public reproducers remain withheld;
+current upstream response/fix status has not been refreshed in this repair.
+Private blockers stay local. Six synthetic JSON seeds are tracked. Broader
+features and current-version checks require separate qualification.

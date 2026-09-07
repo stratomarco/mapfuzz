@@ -1,5 +1,10 @@
 # Target: transformers config parsing (robustness / DoS only)
 
+Current status (2026-09-07): Retired; generates dictionaries and round-trips its own JSON, not malformed JSON or model-specific validation.
+See ../../docs/TARGETS.md. The sections below are historical research notes;
+build/run instructions require the qualification contract and must not be read
+as proof of current reproducibility or upstream coverage.
+
 ## Scope boundary (hard)
 
 This target fuzzes the ROBUSTNESS of parsing a config dict/JSON into a

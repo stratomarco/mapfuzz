@@ -1,12 +1,10 @@
 # Frontier target map
 
-Forward-looking reconnaissance of emerging ML infrastructure, produced after the
-maintained-core result: file loaders and serving runtimes at the center of the
-ecosystem (llama.cpp, vLLM, Triton, huggingface_hub, gptqmodel) are hardened at
-both the DoS and memory-corruption tiers at their trust boundaries. Novel
-findings have therefore moved to newer and more peripheral code. This document
-ranks emerging surfaces by where a structure-aware fuzzer with the seam thesis is
-most likely to find real, novel defects.
+Historical reconnaissance (2026-08-28), superseded for prioritization by
+ROADMAP.md and TARGETS.md on 2026-09-07. The source reads and narrow tests found
+specific guards; they do not establish that major runtimes are hardened at whole
+DoS or memory-corruption tiers. No inference about absence of defects follows.
+The rankings below are historical hypotheses and require fresh M0 verification.
 
 Scoring dimensions (each surface judged against all five):
 - young: new enough that a hardening pass has not happened
@@ -73,7 +71,7 @@ Recon date: 2026-08-28. Re-verify before acting, this space moves monthly.
 - Not surveyed in depth this pass. Often C or C++, often newer and less scrutinized
   than server-side. Parked for a later recon.
 
-## Decision
+## Historical decision (superseded)
 
 Lead with target 1 (world-model runtimes), the youngest and most uncrowded
 surface, and the strongest get-there-early fit. The explicit discipline is to

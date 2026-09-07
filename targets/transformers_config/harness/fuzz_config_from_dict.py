@@ -1,23 +1,9 @@
-"""Atheris harness for transformers config PARSING robustness.
+"""Retired dictionary-generation robustness harness for base PretrainedConfig.
 
-Scope (read this, it is a hard boundary):
-    This fuzzes the robustness of parsing a config dict/JSON into a
-    PretrainedConfig object: crashes, unhandled exceptions, hangs, and memory
-    blowups on malformed input. It is a denial-of-service / robustness target.
-
-    It deliberately does NOT touch the code-execution surface. The recent
-    transformers RCEs (CVE-2026-4372 _attn_implementation_internal kernel
-    dispatch, CVE-2026-5241 auto_map/trust_remote_code, CVE-2026-1839 Trainer
-    torch.load) all live in the dynamic-module / kernel path reached through the
-    Auto classes, not in dict-to-object parsing. We target PretrainedConfig
-    .from_dict / .from_json_file directly, never set trust_remote_code, and
-    strip the code-exec-adjacent keys from every generated input so a mutation
-    cannot wander onto that path. A finding here is a crash or hang, reported as
-    a robustness/DoS defect, never a weaponized config.
-
-Entry point verified against source: PretrainedConfig.from_dict(config_dict,
-**kwargs) at configuration_utils.py:861; from_dict pops trust_remote_code and
-warns it has no effect on this path.
+Builds its own dictionaries and round-trips them through JSON. Does not mutate
+malformed JSON or call model-specific validators or from_json_file. Code-exec
+keys are excluded from generation. Historical observations are in the ledger;
+this target is not qualified for renewed campaigns.
 """
 
 import io

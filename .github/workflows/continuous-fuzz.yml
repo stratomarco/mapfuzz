@@ -1,176 +1,44 @@
 name: continuous-fuzz
-
-# Continuous fuzzing: short campaigns on push/PR, longer nightly. Each target
-# builds its harness, runs a time-boxed campaign, and pipes any crash reports
-# through chassis/triage. Triage exits non-zero only when it classifies a fault
-# as 'real', so a genuine new crash fails the job (gate); shallow and review
-# faults do not. Embargoed targets (tokenizers, pytorch findings/blockers) are
-# NOT run in public CI, to avoid disclosure.
-
 on:
   push:
-    branches: [main]
   pull_request:
-  schedule:
-    - cron: "0 3 * * *"
-  workflow_dispatch:        # allow manual runs for shakeout
-
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  # Fast, dependency-light job that proves the fuzz -> triage -> gate loop runs
-  # end to end WITHOUT a heavy native build. Uses the transformers config
-  # robustness harness (pure Python, no torch). This is the job that should go
-  # green first on a real runner.
-  triage-selftest:
-    runs-on: ubuntu-latest
+  infrastructure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
-      - name: Triage unit tests
-        run: python3 chassis/tests/test_triage.py
-      - name: Triage gate semantics (must exit 1 on a 'real' bucket)
+          python-version: '3.12.11'
+      - run: python3 -m pip install PyYAML==6.0.2
+      - name: Failure gates and resource outcomes
         run: |
-          set +e
-          python3 -m chassis.triage chassis/tests/fixtures/ >/dev/null 2>&1
-          code=$?
-          set -e
-          if [ "$code" -ne 1 ]; then
-            echo "FAIL: expected exit 1 (real bucket present), got $code"; exit 1
-          fi
-          echo "OK: triage gate trips on a real finding (exit 1)"
-
-  # Resource-exhaustion oracle regression guard. Pure stdlib, fast. Runs the
-  # oracle self-test: it must flag an unbounded-allocation loader and an
-  # unbounded-loop loader (killed by a memory/time cap in a child process) and
-  # pass a correctly-bounded loader. Guards the declared-huge class (findings
-  # 0007/C-0014, 0008/C-0015, and C-0023).
-  resource-oracle:
-    runs-on: ubuntu-latest
+          python3 -m unittest discover -s evidence -p 'test_*.py'
+          python3 -m unittest discover -s chassis/tests -p 'test_*.py'
+          python3 chassis/tests/test_triage.py
+          python3 chassis/resource_oracle.py --selftest
+      - name: Validate evidence and generated view
+        run: |
+          python3 evidence/tool.py --check --render
+          git diff --exit-code -- evidence/claims.md
+      - name: Syntax and target inventory
+        run: python3 chassis/check_repository.py
+  differential-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
-      - name: Resource oracle self-test
-        run: python3 chassis/resource_oracle.py --selftest
-
-  # Cross-implementation differential oracle. Verifies the fast/slow invariant
-  # still holds (a broken invariant would make divergence findings untrustworthy)
-  # and runs a short divergence campaign. A divergence would fail the job.
-  differential-fuzz:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Install harness deps
-        run: python3 -m pip install --quiet transformers atheris
-      - name: Invariant self-test (fast==slow must hold)
-        working-directory: targets/tokenizers_differential
-        run: python3 harness/fuzz_fast_slow_divergence.py --selftest
-      - name: Divergence campaign (a divergence fails the job)
-        working-directory: targets/tokenizers_differential
-        run: |
-          DUR=60
-          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=600; fi
-          mkdir -p artifacts
-          python3 harness/fuzz_fast_slow_divergence.py \
-            -max_total_time=$DUR -rss_limit_mb=2048 -artifact_prefix=artifacts/ || true
-          # a divergence writes a crash-* artifact; fail the job if any exist
-          shopt -s nullglob
-          found=(artifacts/crash-*)
-          if [ ${#found[@]} -gt 0 ]; then
-            echo "DIVERGENCE FOUND: ${found[*]}"; exit 1
-          fi
-          echo "no divergence (fast/slow agree)"
-
-  config-fuzz:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Install harness deps
-        run: python3 -m pip install --quiet transformers atheris
-      - name: Restore accumulated corpus
-        uses: actions/cache@v4
-        with:
-          path: targets/transformers_config/corpus_run
-          key: corpus-config-${{ github.run_id }}
-          restore-keys: corpus-config-
-      - name: Self-test the harness
-        working-directory: targets/transformers_config
-        run: python3 harness/fuzz_config_from_dict.py --selftest
-      - name: Fuzz (accumulate into persistent corpus)
-        working-directory: targets/transformers_config
-        run: |
-          DUR=60
-          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=900; fi
-          mkdir -p corpus_run artifacts
-          bash ../../chassis/corpus.sh seed corpus_run corpus || true
-          python3 harness/fuzz_config_from_dict.py \
-            -max_total_time=$DUR -rss_limit_mb=4096 \
-            -artifact_prefix=artifacts/ corpus_run/ || true
-      - name: Minimize corpus before caching
-        working-directory: targets/transformers_config
-        run: |
-          bash ../../chassis/corpus.sh minimize \
-            "python3 harness/fuzz_config_from_dict.py" corpus_min corpus_run || true
-          if [ -n "$(ls -A corpus_min 2>/dev/null)" ]; then rm -rf corpus_run && mv corpus_min corpus_run; else echo "corpus_min empty; keeping existing corpus_run"; fi
-      - name: Triage any crashes (gate on 'real')
-        run: |
-          mkdir -p reports
-          shopt -s nullglob
-          for f in targets/transformers_config/artifacts/crash-*; do
-            python3 targets/transformers_config/harness/fuzz_config_from_dict.py "$f" \
-              2>"reports/$(basename "$f").txt" || true
-          done
-          # triage exits 1 if a real bucket exists -> fails the job
-          python3 -m chassis.triage reports/
-
-  # Heavy native fuzzing. GGUF clones and builds llama.cpp at a pinned commit;
-  # runs only its public fuzz-blockers. Allowed to be slower/flakier than the
-  # Python jobs; does not block them.
-  gguf-fuzz:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install toolchain
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
-      - name: Restore accumulated corpus
-        uses: actions/cache@v4
-        with:
-          path: targets/gguf/corpus_run
-          key: corpus-gguf-${{ github.run_id }}
-          restore-keys: corpus-gguf-
-      - name: Build GGUF harness (public fuzz-blockers applied)
-        working-directory: targets/gguf
-        run: APPLY_FUZZ_BLOCKERS=1 ./build.sh
-      - name: Fuzz (accumulate into persistent corpus)
-        working-directory: targets/gguf
-        run: |
-          DUR=120
-          if [ "${{ github.event_name }}" = "schedule" ]; then DUR=1200; fi
-          mkdir -p corpus_run artifacts
-          bash ../../chassis/corpus.sh seed corpus_run corpus || true
-          ./fuzz_gguf -max_total_time=$DUR -rss_limit_mb=4096 \
-            -artifact_prefix=artifacts/ corpus_run/ 2>run.log || true
-      - name: Minimize corpus before caching
-        working-directory: targets/gguf
-        run: |
-          bash ../../chassis/corpus.sh minimize ./fuzz_gguf corpus_min corpus_run || true
-          if [ -n "$(ls -A corpus_min 2>/dev/null)" ]; then rm -rf corpus_run && mv corpus_min corpus_run; else echo "corpus_min empty; keeping existing corpus_run"; fi
-      - name: Triage any crashes (gate on 'real')
-        run: |
-          mkdir -p reports
-          shopt -s nullglob
-          for f in targets/gguf/artifacts/crash-* targets/gguf/artifacts/timeout-*; do
-            targets/gguf/fuzz_gguf "$f" 2>"reports/$(basename "$f").txt" || true
-          done
-          python3 -m chassis.triage reports/
+          python-version: '3.10.12'
+      - name: Install exact regression environment
+        run: python3 -m pip install --require-hashes -r targets/tokenizers_differential/requirements-linux-py310.lock
+      - name: Pair acceptance and failure behavior
+        run: python3 targets/tokenizers_differential/test_harness.py
+# Target campaigns are paused pending the promotion gates in docs/TARGETS.md.
+# Local campaigns use python3 -m chassis.campaign. No crash logs or artifacts
+# are automatically published by this workflow.

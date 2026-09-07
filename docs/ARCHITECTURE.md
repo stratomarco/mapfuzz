@@ -1,5 +1,9 @@
 # Architecture
 
+Implementation status reviewed 2026-09-07: this document records design intent
+and historical decisions. Target completeness varies; see TARGETS.md. Integration
+scaffolds do not establish a deployed OSS-Fuzz/ClusterFuzzLite instance.
+
 This document explains how the fuzzer is put together and records the decisions behind it, each with the context that forced the choice and the trade-off accepted. It is the reference for why the system looks the way it does. Factual survey claims and per-target evidence live in `REQUIREMENTS.md` and `docs/M0-baseline-audit.md`; this document does not repeat them.
 
 ## 1. System overview
@@ -17,7 +21,7 @@ seed corpus ─▶ mutation engine ─▶ harness ─▶ instrumented loader
                                         fault ─▶ oracle stack ─▶ triage ─▶ PRIVATE_findings ─▶ upstream disclosure
 ```
 
-Everything is organized per format. A target is a self-contained directory holding a harness, a pinned reproducible build, a seed corpus, and grammar notes. The core carries no format-specific logic, so adding a format never touches shared code.
+Everything is organized per format. The target design calls for a harness, pinned build, seed corpus and grammar notes; this is not yet satisfied by every directory. The core carries no format-specific logic, so adding a format never touches shared code.
 
 ## 2. Architectural principles
 
@@ -43,9 +47,9 @@ Corpus. Seeds are minimal, structurally valid, and synthetic, with no proprietar
 
 Oracle stack. Faults are classified, not lumped. Memory-safety faults come from the sanitizer. Resource-exhaustion faults come from allocation and timeout ceilings. Load-time code-execution faults (pickle reduce, unsandboxed template rendering, path traversal on load) are a separate semantic layer. Assertion-triggered aborts are a fourth triage category, distinct from memory-safety findings.
 
-Triage. Every fault is deduplicated by stack hash, minimized to the smallest reproducing input, and recorded with the input, toolchain, and commit needed to reproduce it.
+Triage. The current triage tool groups reports by fault class and source location. Minimization and root-cause confirmation are separate steps; grouping alone does not prove identity.
 
-Continuous fuzzing. The same harness runs in two settings: ClusterFuzzLite for pull-request-time runs in an adopting repo's CI, and OSS-Fuzz for sustained compute on the central instance.
+Continuous fuzzing. Integration scaffolds are provided for two intended settings: ClusterFuzzLite for pull-request-time runs in an adopting repo's CI, and OSS-Fuzz for sustained compute on the central instance.
 
 Disclosure pipeline. Reproducers and undisclosed writeups live in a gitignored `PRIVATE_findings/` directory and move to the upstream maintainer under coordinated disclosure before any public reproducer.
 

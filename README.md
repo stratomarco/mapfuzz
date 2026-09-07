@@ -1,120 +1,73 @@
 # mapfuzz
 
-Continuous, structure-aware fuzzing for the parsers and loaders of machine
-learning model artifacts.
+Security research on parsers and loaders of machine-learning model artifacts.
+ML security is security engineering: a downloaded model file crosses a trust
+boundary when a loader parses and materializes it.
 
-## Thesis
+The project combines structure-aware fuzzing, source review, crash triage and
+bounded negative results. Coverage of mature formats varies by entry point;
+check current upstream fuzz targets before claiming a gap or spending compute.
 
-A model file downloaded from a public hub is attacker-controlled input fed into a
-parser, exactly like a font, a media container, or a PDF. The loaders that consume
-GGUF, safetensors, ONNX, tokenizer files, and pickle-based checkpoints are large
-C, C++, Rust, and Python codebases carrying the usual parser bug surface, plus a
-serialization-driven code-execution surface unique to the ML stack.
+## Results and scope
 
-This project treats the model artifact as a file format, the loader as a parser,
-and the download-to-load transition as a trust boundary, then applies the
-established parser-fuzzing toolchain (libFuzzer, cargo-fuzz, Atheris, structure-
-aware mutation, sanitizers, continuous CI) to the local-AI supply chain. The
-framing is classical security engineering: Anderson on trust boundaries, McGraw
-and BIML on architectural risk analysis for ML systems, the OWASP LLM Top 10 and
-MITRE ATLAS for the supply-chain threat classes. ML security here is an extension
-of security engineering, not a separate discipline.
+The [finding ledger](docs/FINDINGS.md) has eight entries: one known duplicate
+used for harness validation and seven project discoveries. Discovery does not
+establish independent novelty; the minja recursion class also has public prior
+art. Findings and disclosure statuses are historical records unless explicitly
+reverified. No whole-component safety claim follows from a clean campaign.
 
-## Where this fits (and where it does not)
+The canonical [evidence](evidence/claims.yaml) records provenance, observations,
+confidence and boundaries. The validator checks schema structure, not truth or
+adequacy of research evidence. Private reproductions are not available from this
+public checkout.
 
-The field is not empty. Scanners (picklescan, modelscan, ProtectAI Guardian,
-HiddenLayer) detect known-bad patterns. Bounty hunters and vendors find
-individual bugs by hand. Academics build defenses (PickleBall, fickling). Format
-maintainers run their own scans (HuggingFace scanned 116k+ GGUF chat templates;
-onnx and safetensors ship their own fuzz targets).
+## Targets
 
-The open seam is what almost nobody does: maintained, continuous, coverage-guided
-fuzzing of loader internals for unknown memory-safety and logic defects, with
-structure-aware generation to reach past the shallow layer that blind fuzzing and
-scanners cannot. That is what this project is.
+Nine target directories are inventoried in [TARGETS.md](docs/TARGETS.md), with
+tracked harnesses, seeds, status and promotion requirements. Targets include GGUF,
+tokenizers, PyTorch, transformers config, Flax, minja, CLIP/mmproj, gguf-py and
+tokenizer differential research. Two PyTorch harnesses are tracked; historical
+deep storage/container harnesses are absent.
 
-It deliberately stays on the defect-demonstration side of the line. It hunts
-crashes, memory-safety violations, and denial-of-service. It does not build
-weaponized exploits or discover new code-execution/config-injection vectors; the
-config target is scoped to parsing robustness only, with the code-execution
-surface excluded by construction.
+Automatic target campaigns are paused while qualification is repaired.
+Infrastructure tests run on push/PR. CLIP/mmproj materialization is the first
+candidate for renewed depth work, after current M0 and valid-seed reachability.
+Existing no_alloc harnesses do not prove tensor-materialization coverage.
 
-## Targets and results
+## Working locally
 
-Every target begins with an M0 audit (is it already fuzzed?) before any harness is
-written; several candidates were ruled out this way (safetensors, ONNX,
-sentencepiece all already fuzzed). See `docs/M0-baseline-audit.md`.
+This linked worktree uses WSL Git. See [local setup](docs/TARGETS.md#local-execution).
+Core checks on Linux/WSL, with PyYAML installed in an isolated environment:
 
-| Target | Loader | Toolchain | Result |
-|--------|--------|-----------|--------|
-| GGUF | llama.cpp `gguf_init_from_buffer` | C++ / libFuzzer | 5 known-bug reproductions; clean after fuzz-blockers (58M runs) |
-| tokenizers | HF `Tokenizer::from_bytes` | Rust / cargo-fuzz | 1 real finding (decoder panic on load, DoS); clean after blocker |
-| pytorch | `weights_only` unpickler | Python / Atheris | 4 harnesses incl. structure-aware; storage surface mapped, robust |
-| transformers config | `PretrainedConfig.from_dict` | Python / Atheris | parsing robustness; clean over a real campaign |
-
-Findings are tracked in `docs/FINDINGS.md`. Clean results are recorded honestly:
-across these targets the shallow bug layer is largely exhausted, and the remaining
-defects need the structure-aware depth that is this project's differentiation. A
-clean run that provably reached the target (confirmed by coverage growth) is a
-useful negative result, not a non-result.
-
-## What is in here
-
-```
-targets/<name>/        one directory per target
-  harness/             fuzz harness source (verified entry point)
-  build.sh             reproducible build (pinned upstream version)
-  corpus/              seed corpus (synthetic, no proprietary weights)
-  grammar/             structure-aware mutation notes and generators
-  fuzz-blockers/       local patches to fuzz past known-shallow bugs (public bugs only)
-  README.md            provenance, M0 result, bug classes, scope
-chassis/               shared machinery, not per-target
-  triage.py            dedup crash reports by fault location; classify shallow/real
-  tests/               validated against real fault reports from actual runs
-docs/                  M0 audit, findings ledger, architecture, lessons, roadmap
-.github/workflows/     continuous-fuzz: short per-target runs, triage-gated
-ci/, oss-fuzz/         layouts for continuous instances
+```bash
+python3 -m unittest discover -s evidence -p 'test_*.py'
+python3 -m unittest discover -s chassis/tests -p 'test_*.py'
+python3 chassis/tests/test_triage.py
+python3 chassis/resource_oracle.py --selftest
+python3 evidence/tool.py --check --render
+python3 chassis/check_repository.py
 ```
 
-## Structure-aware generation
+`chassis.campaign` records command, exit status, combined output and artifacts,
+and fails closed on execution failures or fault artifacts. Triage labels are
+review aids, not severity or novelty determinations. Unknown reports fail.
+The resource oracle independently tests memory limits and wall-clock timeout;
+its synthetic tests do not establish real model-loader protection.
 
-Blind byte mutation exhausts the shallow layer quickly and cannot assemble the
-valid-but-malformed inputs that reach a backend. The generators here build valid
-structures and fuzz the dangerous fields: for the pytorch unpickler, valid pickle
-opcode streams calling an allowlisted rebuild function with fuzzer-chosen
-size/stride/offset arguments, reaching the C++ tensor backend on every iteration
-(verified by coverage growth). This is the capability scanners and blind fuzzers
-do not have, and where an unknown defect would most plausibly live.
+## Layout
 
-## Triage chassis
-
-`chassis/triage.py` collapses a pile of crash artifacts into the few distinct
-faults they represent (dedup by fault location, not by input) and classifies each
-as shallow, real, or review. It parses AddressSanitizer, UBSan, Rust panic, Python
-traceback, and native-signal reports, and is validated against fault reports
-captured from real runs. This codifies the manual triage the project did
-repeatedly, and is what lets the continuous layer gate on genuine findings.
-
-## Discipline (the lessons that shaped the tool)
-
-- Verify the entry point and behavior against source, never assume; probe that a
-  generated input actually loads before spending a campaign.
-- Verify fixes behaviorally, not by proxy strings; a registry-crate edit does not
-  rebuild (use a local checkout plus a patch override).
-- Dedup crashes by fault location, not file count (14,724 artifacts were one bug).
-- Check prior art before treating a crash as a finding.
-- A fuzz-blocker patch for an unreported bug is a disclosure artifact; embargo it.
-
-See `docs/LESSONS.md`.
+- `targets/`: harnesses and historical build/seed material; completeness varies.
+- `chassis/`: campaign runner, triage, resource oracle and regression tests.
+- `evidence/`: canonical YAML, generated Markdown and schema validation.
+- `docs/`: findings, scope, historical research and the current roadmap.
+- `.github/workflows/`: infrastructure and evidence gates.
+- `ci/`, `oss-fuzz/`: integration scaffolds, not proof of deployed services.
 
 ## Security and disclosure
 
-This tooling finds real vulnerabilities in third-party software. Findings are
-handled under coordinated disclosure (`SECURITY.md`): reported privately first,
-with public reproducers withheld until a fix ships. Live reproducers and the
-disclosure reports for unreported findings are kept in a gitignored
-`PRIVATE_findings/` directory and never pushed before disclosure.
+Scope is defect demonstration: crashes, resource exhaustion and correctness
+observations. See [SECURITY.md](SECURITY.md). Private findings, campaign logs and
+live reproducers stay local unless disclosure is authorized. Public upstream PRs
+may already contain details; each ledger entry records its own status.
 
-## License
-
-Apache-2.0. See `LICENSE`.
+Apache-2.0; see LICENSE.

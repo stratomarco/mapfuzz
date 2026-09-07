@@ -1,5 +1,10 @@
 # Target: flax / JAX checkpoint restore
 
+Current status (2026-09-07): Paused; no qualified locked environment is provided.
+See ../../docs/TARGETS.md. The sections below are historical research notes;
+build/run instructions require the qualification contract and must not be read
+as proof of current reproducibility or upstream coverage.
+
 The JAX-ecosystem sibling of the pytorch weights_only target. Restoring an
 untrusted JAX/flax checkpoint is a download-to-load trust boundary used by
 DreamerV3 and most JAX world models.

@@ -1,5 +1,10 @@
 # Target: minja chat-template parser (llama.cpp's C++ Jinja engine)
 
+Current status (2026-09-07): Archived for llama.cpp work; historical google/minja target.
+See ../../docs/TARGETS.md. The sections below are historical research notes;
+build/run instructions require the qualification contract and must not be read
+as proof of current reproducibility or upstream coverage.
+
 ## Trust boundary
 
 A chat template ships INSIDE a model's tokenizer config and is parsed and

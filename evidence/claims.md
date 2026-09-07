@@ -5,7 +5,7 @@
 
 ## Findings (real defects)
 
-### C-0001  (inferred | severity: low | status: reported)
+### C-0001  (verified | severity: low | status: reported)
 **A malformed decoder field causes a panic (process abort) at decoders/mod.rs:90 via .expect() on an untrusted deserialize (finding 0002).**
 
 - target: tokenizers / Tokenizer::from_str / from_bytes
@@ -127,7 +127,7 @@
 
 ## Non-findings (deliberately not counted)
 
-### C-0020  (inferred | severity: none | status: active)
+### C-0020  (verified | severity: none | status: active)
 **from_state_dict raises a raw AttributeError (not flax's SerializationError) when the state's type does not match the target; a robustness nit, NOT a security finding.**
 
 - target: flax_checkpoint / from_state_dict
@@ -196,9 +196,9 @@
 - target: tensorrt_llm / PretrainedConfig __init__ via from_checkpoint and from_json_file
 - date: 2026-08-19
 - provenance:
-  - source-read modeling_utils.py line 447 head_size = hidden_size floordiv num_attention_heads with no positivity check anywhere in __init__
-  - source-read modeling_utils.py from_json_file line 511 json.load then from_dict, from_dict line 496 config_cls of the file dict as kwargs, from_checkpoint line 526 loads config.json by the same path
-  - reachability confirmed by source-read, a crafted config.json with num_attention_heads 0 reaches the division
+  - source-read:modeling_utils.py line 447 head_size = hidden_size floordiv num_attention_heads with no positivity check anywhere in __init__
+  - source-read:modeling_utils.py from_json_file line 511 json.load then from_dict, from_dict line 496 config_cls of the file dict as kwargs, from_checkpoint line 526 loads config.json by the same path
+  - source-read:reachability confirmed by source-read, a crafted config.json with num_attention_heads 0 reaches the division
 - observation: A sibling issue at line 494 MODEL_MAP indexed by config architecture raises KeyError on an unknown architecture string, same DoS-on-load class, also a dict lookup not a dynamic import so not a code-execution class. Both are crash-on-malformed-config robustness gaps at model load.
 - boundary: Reachable from a checkpoint config file. Severity low, the impact is a raw ZeroDivisionError instead of a clean ValueError at load, during an offline developer-run conversion or build step, not a running multi-tenant request path. No documented claim that TRT-LLM safely loads untrusted checkpoints, and model-conversion tooling is treated as trusted input across the ecosystem, so this is recorded as a robustness non-finding by the implicit threat model, not a vulnerability. A one-line hardening (validate num_attention_heads greater than 0 and raise a clear error) would fix it, held for possible future private report.
 - refs: docs/THREAT-MODEL.md
@@ -209,10 +209,10 @@
 - target: vllm / SamplingParams _validate_allowed_token_ids and gpu_input_batch mask build
 - date: 2026-08-28
 - provenance:
-  - executed sampling_params _validate_allowed_token_ids with tokenizer None passed an out-of-vocab id 999999999 with no rejection, in vllm 0.28.0
-  - executed the same validator with a tokenizer present and it raised VLLMValidationError rejecting the out-of-vocab id, confirming the defended path
-  - reproduced the gpu_input_batch operation mask req_index indexed by the id equals False on a bool tensor of width 151936, which raised IndexError index 999999999 out of bounds
-  - source-read completion serving.py line 176 to_sampling_params is called with no tokenizer and no verify call in that path, so verification is deferred to the engine where tokenizer is None under skip-tokenizer-init
+  - execution-run:environment not recorded; executed sampling_params _validate_allowed_token_ids with tokenizer None passed an out-of-vocab id 999999999 with no rejection, in vllm 0.28.0
+  - execution-run:environment not recorded; executed the same validator with a tokenizer present and it raised VLLMValidationError rejecting the out-of-vocab id, confirming the defended path
+  - execution-run:environment not recorded; reproduced the gpu_input_batch operation mask req_index indexed by the id equals False on a bool tensor of width 151936, which raised IndexError index 999999999 out of bounds
+  - source-read:completion serving.py line 176 to_sampling_params is called with no tokenizer and no verify call in that path, so verification is deferred to the engine where tokenizer is None under skip-tokenizer-init
 - observation: Confirmed empirically in-process that the vocab check is skipped when tokenizer is None and that the downstream fancy-index raises IndexError. Did not confirm whether the OpenAI server routes a request allowed_token_ids to that path in skip-tokenizer-init mode, full-server testing was blocked by WSL2 lacking UVA so the live request path could not be exercised on this host.
 - boundary: Requires the non-default --skip-tokenizer-init deployment mode. Normal deployments pass a real tokenizer and are defended, confirmed. Severity ceiling DoS (IndexError), not memory corruption. Blast radius (per-request vs worker) and remote reachability both unconfirmed. Recorded as a low-severity robustness observation, the durable fix is to make the vocab check unconditional rather than gated on tokenizer presence. Not claimed as a remote vulnerability.
 - refs: docs/THREAT-MODEL.md, docs/LESSONS.md
@@ -283,7 +283,7 @@
 - boundary: Scoped to metadata/tensor-descriptor parsing with no_alloc=true, at commit 432d7ffe. This configuration does NOT exercise the allocation-size-computation path (no_alloc skips allocation), which is where the GGUF integer-overflow CVE class lives: CVE-2025-53630 and its bypass CVE-2026-27940 (gguf_init_from_file _impl undersized heap alloc), oss-sec V-01..V-06 (2026-05-15, GGML_PAD/string/ n_dims/blck_size), and Talos 2024 (gguf_fread_str/ne/n_tensors heap overflows). Those remain an active, repeatedly-reopened class NOT covered by this harness. The declared-huge/resource-exhaustion negative holds only for the no_alloc descriptor-parse surface; it is not a claim that GGUF loading is memory-safe. The 5 bugs this harness reproduced are pre-existing/duplicate, not new findings.
 - refs: targets/gguf/, docs/RELATED-WORK.md
 
-### C-0035  (verified | severity: none | status: active)
+### C-0035  (verified | status: active)
 **After neutralizing 0006 (scalar + array type checks) and 0007 (n_layer bound) as fuzz-blockers, an extended clip_init campaign ran 22,845,113 executions with no further crash, OOM, or UB on the hparam-parsing surface.**
 
 - target: clip_mmproj / clip_init / load_hparams
@@ -294,7 +294,7 @@
 - boundary: Maps the hparam-parsing surface only. The tensor-loading surface (needs a tensor-carrying seed) was not exercised; noted as future depth.
 - refs: targets/clip_mmproj/harness/fuzz_clip.cpp
 
-### C-0036  (verified | severity: none | status: active)
+### C-0036  (verified | status: active)
 **After blocking finding 0008 (array-length bound), an extended GGUFReader campaign ran 2,214,906 runs with no further crash on the parsing surface.**
 
 - target: gguf_py_reader / GGUFReader / _get_field_parts
@@ -305,7 +305,7 @@
 - boundary: Scoped to the metadata/KV parsing surface reached from GGUFReader with the 0008 width-bound applied. The tensor-data materialization surface (reading actual tensor bytes) was not exercised by this harness and is untested.
 - refs: targets/gguf_py_reader/harness/fuzz_gguf_reader.py
 
-### C-0037  (verified | severity: none | status: active)
+### C-0037  (verified | status: active)
 **The gguf-py reader tensor path handles hostile tensor metadata cleanly: huge declared dims fail with a numpy reshape ValueError, the quant type is validated via an enum cast, and no quant type has a zero block_size or is missing from the size table, so the size math does not divide by zero or KeyError.**
 
 - target: gguf_py_reader / GGUFReader._build_tensors (tensor path) / quants.py
@@ -319,28 +319,28 @@
 - boundary: Scoped to the tensor-info parse and size computation. The finding on this component is 0008 (KV array-length loop); the tensor path itself is hardened. Actual tensor-data dequantization on adversarial bytes was not separately fuzzed; numpy reshape strictness makes size-mismatch a clean error, but a dedicated dequant campaign is future depth.
 - refs: docs/M0-baseline-audit.md
 
-### C-0038  (inferred | severity: none | status: active)
+### C-0038  (inferred | status: active)
 **A sweep for the decompression-bomb and zip-slip class across the download and container-handling paths of the maintained loaders found them defended. DDUF refuses compressed entries and reads by offset without disk extraction, and the gptqmodel machete downloader uses the safe tar extraction filter.**
 
 - target: project / decompression call sites across huggingface_hub, gptqmodel, llama.cpp tooling
 - date: 2026-08-19
 - provenance:
-  - source-read huggingface_hub _dduf.py line 136 rejects any entry whose compress_type is not ZIP_STORED, so no decompression bomb, and it reads entries by mmap offset rather than extracting to disk, so no zip-slip
-  - source-read huggingface_hub _dduf.py _validate_dduf_entry_name enforces an allowlist of extensions, rejects backslash separators, and allows at most one directory level
-  - source-read gptqmodel machete.py line 168 to 172 passes filter data to tarfile extractall on Python 3.12 and later, from a pinned HTTPS NVIDIA release URL
+  - source-read:huggingface_hub _dduf.py line 136 rejects any entry whose compress_type is not ZIP_STORED, so no decompression bomb, and it reads entries by mmap offset rather than extracting to disk, so no zip-slip
+  - source-read:huggingface_hub _dduf.py _validate_dduf_entry_name enforces an allowlist of extensions, rejects backslash separators, and allows at most one directory level
+  - source-read:gptqmodel machete.py line 168 to 172 passes filter data to tarfile extractall on Python 3.12 and later, from a pinned HTTPS NVIDIA release URL
 - observation: Probed the decompression class specifically since it is a different mechanism from the declared-huge count class. DDUF designs out both bomb (no compression) and zip-slip (no extraction). Machete uses the version-gated safe filter and a trusted pinned URL. No attacker-reachable bomb or traversal found in the model threat model.
 - boundary: Scoped to the decompression sites reachable in the download and container paths of these maintained libraries. One narrow defense-in-depth nit noted and not counted as a finding: machete on Python 3.11 and earlier extracts without the filter, but only from a trusted pinned URL and only on old Python, a stacked precondition well below the finding bar. The broader lesson is that maintained central code is consistently hardened on the classes tested this session.
 - refs: docs/M0-baseline-audit.md
 
-### C-0039  (inferred | severity: none | status: active)
+### C-0039  (inferred | status: active)
 **The GGUF-metadata to llama.cpp-consumer composition boundary is defended, including cross-field consistency. Values that a GGUF parser accepts as well-formed are re-checked for semantic safety by the consumer before use as divisors, sizes, or per-layer array lengths.**
 
 - target: llama_cpp_consumer / llama-model.cpp hparam load and llama-model-loader.cpp get_key_or_arr
 - date: 2026-08-19
 - provenance:
-  - source-read llama-model.cpp line 1109 asserts n_layer_all is greater than 0 and at most LLAMA_MAX_LAYERS
-  - source-read llama-model.cpp line 1208 guards the n_embd over n_head division behind a check that n_head is greater than 0, and llama-hparams.cpp line 78 guards n_head_kv equal to 0
-  - source-read llama-model-loader.cpp line 454 get_key_or_arr rejects n greater than N_MAX, and rejects a metadata array whose length does not equal the expected per-layer count n
+  - source-read:llama-model.cpp line 1109 asserts n_layer_all is greater than 0 and at most LLAMA_MAX_LAYERS
+  - source-read:llama-model.cpp line 1208 guards the n_embd over n_head division behind a check that n_head is greater than 0, and llama-hparams.cpp line 78 guards n_head_kv equal to 0
+  - source-read:llama-model-loader.cpp line 454 get_key_or_arr rejects n greater than N_MAX, and rejects a metadata array whose length does not equal the expected per-layer count n
 - observation: Probed the consumer side rather than the parser. The divisor field head_count is guarded against 0, the layer count is bounded against the fixed maximum, and the per-layer arrays are fixed-size std::array of size N_MAX pre-zeroed at load. The cross-field check that a metadata array length must equal the layer count prevents both an over-long copy into the fixed buffer and a short-array out-of-bounds read. Safe by construction.
 - boundary: Scoped to the hparam load path and the get_key_or_arr array handling in a current llama.cpp checkout. This is the most-scrutinized pair in the ecosystem and it validates cross-field consistency, not just per-field type. The composition thesis is better tested on cross-maintainer pairs where the producer and consumer are separate codebases. Strong defended result here.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
@@ -372,7 +372,7 @@
 - boundary: Establishes the target is open and the boundary is real. Yielded two findings (C-0010, C-0011). Does not establish the interpreter is memory-unsafe (see the ongoing render campaign).
 - refs: docs/M0-baseline-audit.md, targets/minja_template/
 
-### C-0042  (inferred | severity: none | status: active)
+### C-0042  (inferred | status: active)
 **jax._src.pickle_util was evaluated and declined: it is a thin cloudpickle.loads passthrough for internal host callbacks, with no defended trust boundary (pickle executes code by design).**
 
 - target: jax / jax._src.pickle_util.loads
@@ -384,7 +384,7 @@
 - boundary: Refines the target-selection filter: "unfuzzed" is insufficient; a target needs a DEFENDED trust boundary where a crash/divergence is a genuine defect. Raw pickle has none.
 - refs: docs/M0-baseline-audit.md
 
-### C-0043  (verified | severity: low | status: reported)
+### C-0043  (verified | status: reported)
 **Findings 0004 and 0005 were validated by Google Bug Hunters as product vulnerabilities (not VRP-rewarded, OT tier) and disclosed via direct upstream PR google/minja#92. Status flipped embargoed -> reported.**
 
 - target: minja / parseExpression / BinaryOpExpr / Value::operator
@@ -411,7 +411,7 @@
 - boundary: Establishes finding 0008 as a concrete cross-impl inconsistency, not expected behaviour. Lesson: a project's reference/secondary implementation may be weaker than its production one; fuzz the reference impl, not only the primary.
 - refs: docs/LESSONS.md, PRIVATE_findings/0008-gguf-py-reader-unbounded-array-dos.md
 
-### C-0045  (inferred | severity: none | status: active)
+### C-0045  (inferred | status: active)
 **huggingface_hub's download path-construction boundary is properly defended against the path-traversal class: a repo-controlled filename is validated before use and the joined path is containment-checked against the snapshot dir.**
 
 - target: huggingface_hub / hf_hub_download / _validate_relative_filename / _get_pointer_path
@@ -424,84 +424,84 @@
 - boundary: Defended boundary; not a productive fuzz target for input-driven traversal. One deliberate design note: _get_pointer_path uses os.path.abspath (lexical) not resolve() (symlink-following) for the containment check, a documented tradeoff; a symlink-based escape would require pre-existing attacker write access to the cache, which is out of this threat model. Recorded as a mapping of what is solid, mirrors the pytorch/GGUF negatives. Pivot to a softer surface.
 - refs: docs/M0-baseline-audit.md
 
-### C-0046  (inferred | severity: none | status: active)
+### C-0046  (inferred | status: active)
 **gptqmodel validates the quantize-config fields that feed downstream size and bit arithmetic. bits must resolve to a supported width, and group_size must be -1 or a positive value, so a downloaded quantize_config.json cannot drive a div-by-zero from a zero bits or zero group_size into the pack and unpack math.**
 
 - target: gptqmodel / QuantizeConfig __post_init__ validation
 - date: 2026-08-19
 - provenance:
-  - source-read config.py line 2705 rejects group_size that is not -1 and is not positive
-  - source-read config.py lines 2622 to 2634 validate bits against the supported width set with a raise
-  - source-read config.py line 2613 validates dynamic per-layer group_size, and lines 3629 and 3731 reject misused group_size in FP8 and BnB configs
+  - source-read:config.py line 2705 rejects group_size that is not -1 and is not positive
+  - source-read:config.py lines 2622 to 2634 validate bits against the supported width set with a raise
+  - source-read:config.py line 2613 validates dynamic per-layer group_size, and lines 3629 and 3731 reject misused group_size in FP8 and BnB configs
 - observation: Both div-by-zero candidates (a zero bits reaching the 32-over-bits math, and a zero group_size reaching the grouping math) are rejected at config construction. Validation covers the main config, the dynamic per-layer path, and the format-specific configs. Source-read verdict, since the package import was blocked by its heavy model-zoo dependency chain and the guards were read directly.
 - boundary: Defended boundary on the config-parsing surface. Not verified by execution because the dependency chain blocked a clean import, and the source clearly shows the guards. The GPU pack and unpack kernels were not fuzzed because they require CUDA, and their div-by-zero inputs are gated by this upstream config validation. Same pattern as the other maintained loaders, hardened on the obvious classes.
 - refs: docs/M0-baseline-audit.md
 
-### C-0047  (verified | severity: none | status: active)
+### C-0047  (verified | status: active)
 **The DDUF-to-diffusers composition seam, where a model config names component libraries and classes that the loader dynamically imports and instantiates, is a real high-severity vulnerability class. It is already public as the FaceHugger set and is not a novel finding. Our composition M0 reached the same seam independently, which validates the method.**
 
 - target: diffusers / DiffusionPipeline.from_pretrained dynamic component load from model_index.json
 - date: 2026-08-19
 - provenance:
-  - source-read pipeline_loading_utils.py get_class_obj_and_candidates imports library_name from config with importlib and the trust gate sat on a different path
-  - web huggingface diffusers security advisory GHSA-j7w6-vpvq-j3gm None.py trust_remote_code bypass verified against a DDUF pipeline
-  - web CVE-2026-44513 and CVE-2026-44827 and CVE-2026-45804 FaceHugger by Zafran Security, config-as-code TOCTOU, fixed in diffusers 0.38.0 May 2026
-  - web parallel transformers config injection CVE-2026-4372 via attn implementation internal, same root cause
+  - source-read:pipeline_loading_utils.py get_class_obj_and_candidates imports library_name from config with importlib and the trust gate sat on a different path
+  - source-read:web huggingface diffusers security advisory GHSA-j7w6-vpvq-j3gm None.py trust_remote_code bypass verified against a DDUF pipeline
+  - source-read:web CVE-2026-44513 and CVE-2026-44827 and CVE-2026-45804 FaceHugger by Zafran Security, config-as-code TOCTOU, fixed in diffusers 0.38.0 May 2026
+  - source-read:web parallel transformers config injection CVE-2026-4372 via attn implementation internal, same root cause
 - observation: Zafran root cause matches the composition thesis directly. The trust check runs in one phase while the code load runs in another, so config content the gate did not see crosses into executed code. CVE-2026-44827 is the DDUF case exactly, a model_index.json declaring a standard class name while silently loading code. Reached blind via the composition M0 before the prior-art check surfaced it.
 - boundary: NOT a novel finding. Recorded as prior art and as method validation. The composition angle independently converged on the seam that produced four CVEs, which corroborates that trust-boundary composition is where serious ML supply chain bugs live. Popular libraries diffusers and transformers are now actively researched for this class, so novel work in it should target quieter component pairs or a different bug class such as native memory corruption.
 - refs: docs/RELATED-WORK.md, docs/THREAT-MODEL.md
 
-### C-0048  (inferred | severity: none | status: active)
+### C-0048  (inferred | status: active)
 **The clip mmproj C++ tensor-loading path is defended against the overflow and out-of-bounds class. Read sizes are derived from the allocated tensor via ggml_nbytes rather than from file-controlled values, tensor offsets come from the hardened gguf_init_from_file parser, and the vector helper is constrained to F32 so its byte count is always 4-aligned.**
 
 - target: clip_mmproj / tools/mtmd/clip.cpp tensor data load loop
 - date: 2026-08-19
 - provenance:
-  - source-read clip.cpp line 3505 num_bytes is ggml_nbytes(cur) from the allocated tensor, and line 3506 reads that exact size into cur->data, with the temp-buffer branch resizing to match
-  - source-read clip.cpp line 3499 to 3502 the seek is error-checked before the read
-  - source-read clip.cpp line 2114 get_vector rejects any tensor that is not F32 before reading, so n_bytes is always a multiple of 4 and result sized n_bytes over 4 floats fits the read exactly
-  - source-read clip.cpp line 1154 offsets come from gguf_init_from_file, the parser hardened by the recent GGUF offset and size CVE fixes
+  - source-read:clip.cpp line 3505 num_bytes is ggml_nbytes(cur) from the allocated tensor, and line 3506 reads that exact size into cur->data, with the temp-buffer branch resizing to match
+  - source-read:clip.cpp line 3499 to 3502 the seek is error-checked before the read
+  - source-read:clip.cpp line 2114 get_vector rejects any tensor that is not F32 before reading, so n_bytes is always a multiple of 4 and result sized n_bytes over 4 floats fits the read exactly
+  - source-read:clip.cpp line 1154 offsets come from gguf_init_from_file, the parser hardened by the recent GGUF offset and size CVE fixes
 - observation: Probed the tensor-data path that the earlier clip harness did not reach (it stopped at hparam parsing, C-0035). Two overflow hypotheses (a 1-3 byte overflow from integer truncation in get_vector, and a file-controlled read size exceeding the allocation in the main loop) both dissolved on close reading. Reads are allocation-bounded and offsets are parser-validated.
 - boundary: Scoped to the tensor read path in a current llama.cpp checkout. The clip findings are 0006 and 0007 on the metadata path (found, PR 27202). The tensor path is defended. One low-severity residual noted and not a finding, a short read past EOF could leave an uninitialized tail in a tensor buffer, but the read size matches the allocation so there is no overflow. CVE-tier memory corruption not present on this surface.
 - refs: docs/M0-baseline-audit.md, PRIVATE_findings
 
-### C-0049  (inferred | severity: none | status: active)
+### C-0049  (inferred | status: active)
 **In tokenizer-present mode, the vLLM serving layer defends the sampling-parameter token-id seam. Request fields that become indices into the logits or vocab are validated against vocab size in a model-aware pass before the engine uses them, so a well-formed but out-of-vocab token id does not reach an unbounded tensor index. This holds only when a tokenizer is present. C-0026 records the confirmed exception, in skip-tokenizer-init mode the vocab check is skipped, which is a separate low-severity observation.**
 
 - target: vllm / SamplingParams verify and v1 sampler token-id application
 - date: 2026-08-19
 - provenance:
-  - source-read sampling_params.py _validate_allowed_token_ids rejects any id that is negative or at least vocab_size, called from verify with the tokenizer on the SamplingParams path in input_processor.py line 97
-  - source-read v1 sample ops bad_words.py applies the mask via a slice assignment logits last_token_id to last_token_id plus 1, which clamps silently and cannot go out of bounds
-  - source-read gpu_input_batch.py builds allowed_token_ids_mask sized to vocab_size, and the raw ids reaching the fancy-index are gated by the model-aware validator upstream
+  - source-read:sampling_params.py _validate_allowed_token_ids rejects any id that is negative or at least vocab_size, called from verify with the tokenizer on the SamplingParams path in input_processor.py line 97
+  - source-read:v1 sample ops bad_words.py applies the mask via a slice assignment logits last_token_id to last_token_id plus 1, which clamps silently and cannot go out of bounds
+  - source-read:gpu_input_batch.py builds allowed_token_ids_mask sized to vocab_size, and the raw ids reaching the fancy-index are gated by the model-aware validator upstream
 - observation: Traced the token-id-as-index seam through three consumers. The bad_words path is safe by slice-clamp semantics. The allowed_token_ids path is guarded by a deferred model-aware validator that runs once vocab is known, the correct place for a check the request layer cannot make. The second verify call site is for PoolingParams, a different parameter type, not a bypass of the SamplingParams check.
 - boundary: Scoped to the sampling-parameter token-id fields on the SamplingParams path in a current vLLM checkout, tokenizer-present mode only. The tokenizer-absent gap is no longer hypothetical, C-0026 confirmed in-process that the vocab check is skipped when tokenizer is None and the mask fancy-index then raises IndexError. So this claim must be read strictly as tokenizer-present, with C-0026 as the exception. Extends the seam-checking pattern into the serving runtime for the default (tokenizer-present) path only.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
 
-### C-0060  (inferred | severity: none | status: active)
+### C-0060  (inferred | status: active)
 **Triton's request-path memory-corruption seams are defended with explicit overflow guards. The shape-to-bytes multiply checks each product against INT64_MAX before multiplying, and the shared-memory offset-plus-byte-size path checks byte_size against SIZE_MAX minus offset before adding, then bounds the result against the registered region size.**
 
 - target: triton / shape-size math GetElementCount and GetByteSize, and shared-memory GetMemoryInfo
 - date: 2026-08-19
 - provenance:
-  - source-read model_config.h GetElementCount checks cnt greater than INT64_MAX over dim before each multiply and returns an overflow sentinel, and handles wildcard and negative dims
-  - source-read model_config.h GetByteSize checks cnt greater than INT64_MAX over dt_size before the element-times-dtype multiply and propagates the overflow sentinel
-  - source-read shared_memory_manager.cc GetMemoryInfo line 477 checks byte_size greater than SIZE_MAX minus offset before the addition, after bounding offset against region size at 469, then checks the sum against region size at 490 before handing out the pointer at 503
+  - source-read:model_config.h GetElementCount checks cnt greater than INT64_MAX over dim before each multiply and returns an overflow sentinel, and handles wildcard and negative dims
+  - source-read:model_config.h GetByteSize checks cnt greater than INT64_MAX over dt_size before the element-times-dtype multiply and propagates the overflow sentinel
+  - source-read:shared_memory_manager.cc GetMemoryInfo line 477 checks byte_size greater than SIZE_MAX minus offset before the addition, after bounding offset against region size at 469, then checks the sum against region size at 490 before handing out the pointer at 503
 - observation: Deliberately hunted memory corruption rather than DoS at the two highest-risk spots in a mature serving runtime, the shape-size arithmetic and the shared-memory offset-plus-size path. Both apply the overflow-safe formulation, with a comment showing the overflow was consciously considered. The shared memory path is the single most likely out-of-bounds source in a serving runtime and it is closed.
 - boundary: Scoped to the request-path size arithmetic and shared-memory bounds in a current Triton checkout. The model repository remains trusted by NVIDIA's documented threat model and was not treated as an attack surface. The result extends the maintained-core-hardened finding to the memory-corruption tier on a serving runtime, both DoS-class and overflow-class seams are defended.
 - refs: docs/THREAT-MODEL.md, docs/M0-baseline-audit.md
 
-### C-0061  (verified | severity: none | status: active)
+### C-0061  (verified | status: active)
 **At the tested Isaac-GR00T revision, the policy server's deserialization boundary resists three specific classes, measured on the versions recorded below. MsgSerializer rejects object-dtype NPY and msgpack-numpy payloads before either decode path can unpickle attacker data. msgpack rejects the tested array32 and map32 declaration bombs. np.load and frombuffer reject a declared-shape-versus-actual-bytes mismatch with zero measured allocation. This is scoped to those tested inputs and versions, not a general safety claim, and it says nothing about authentication, which is tracked separately.**
 
 - target: nvidia_groot / gr00t/policy/server_client.py MsgSerializer.from_bytes and the ZMQ run loop
 - date: 2026-08-28
 - provenance:
-  - versions tested GR00T commit 51d4c89f72fda44cbf77285c6a8114b52676b8a1, python 3.10.12, numpy 2.2.6, msgpack 1.1.0, msgpack-numpy 0.4.8
-  - source-read server_client.py MsgSerializer._safe_decode rejects object-dtype ndarray payloads two ways before np.load or mnp.decode can unpickle, np.load is called with allow_pickle False
-  - machine-run msgpack unpackb rejects a 5-byte array32 header declaring 4.29e9 elements with ValueError exceeds max_array_len, same for map32, on msgpack 1.1.0
-  - machine-run measured peak RSS delta of np.load allow_pickle False on crafted NPY headers declaring 1e6, 1e8, and 5e8 float64 elements with no data was 0.0 MB each, all rejected with ValueError before allocation, on numpy 2.2.6
-  - machine-run msgpack-numpy mnp.decode uses frombuffer which raises TypeError buffer is too small when declared shape exceeds actual data bytes, on msgpack-numpy 0.4.8
+  - environment:versions tested GR00T commit 51d4c89f72fda44cbf77285c6a8114b52676b8a1, python 3.10.12, numpy 2.2.6, msgpack 1.1.0, msgpack-numpy 0.4.8
+  - source-read:server_client.py MsgSerializer._safe_decode rejects object-dtype ndarray payloads two ways before np.load or mnp.decode can unpickle, np.load is called with allow_pickle False
+  - machine-run:msgpack unpackb rejects a 5-byte array32 header declaring 4.29e9 elements with ValueError exceeds max_array_len, same for map32, on msgpack 1.1.0
+  - machine-run:measured peak RSS delta of np.load allow_pickle False on crafted NPY headers declaring 1e6, 1e8, and 5e8 float64 elements with no data was 0.0 MB each, all rejected with ValueError before allocation, on numpy 2.2.6
+  - machine-run:msgpack-numpy mnp.decode uses frombuffer which raises TypeError buffer is too small when declared shape exceeds actual data bytes, on msgpack-numpy 0.4.8
 - observation: Tested in-process against the exact from_bytes entry point with no model and no GPU. The NPY allocation-safety was measured, not inferred, peak RSS did not move for declared shapes up to 5e8 float64 because the data-length check fires before allocation on numpy 2.2.6. This is version-specific and was not re-tested on GR00T's own pinned numpy. The unauthenticated-parse structural point (token is inside the payload, so auth runs after from_bytes) is real but is not a defense and is tracked as a separate finding, not resolved here.
 - boundary: Scoped strictly to the three tested classes on the recorded versions. NOT a general claim that the boundary is safe, only that these specific inputs were rejected with zero measured allocation. Not tested, other numpy versions, live-server timing, ZMQ state-machine behavior, and handler internals. Does not cover authentication or authorization, which is a separate finding. A negative result on tested amplification inputs, not proof that no amplification exists.
 - refs: docs/FRONTIER.md, docs/THREAT-MODEL.md

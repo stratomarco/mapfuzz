@@ -28,9 +28,9 @@ def test_dedup_collapses_by_location():
 
 
 def test_classification_matches_session_judgments():
-    # enum cast and assertion are shallow blockers (block-and-continue)
-    assert classify(_sig("gguf_ubsan_enum_705.txt"))[0] == "shallow"
-    assert classify(_sig("gguf_assert_194.txt"))[0] == "shallow"
+    # A fault class alone cannot establish an approved known blocker.
+    assert classify(_sig("gguf_ubsan_enum_705.txt"))[0] == "review"
+    assert classify(_sig("gguf_assert_194.txt"))[0] == "review"
     # the tokenizers decoder panic is the real finding (0002)
     s = _sig("tokenizers_panic_90.txt")
     assert s.fault_class == "rust-panic-unwrap"

@@ -180,8 +180,8 @@ def parse_report(text: str):
 # that walls the fuzzer; block it locally to go deeper. "real" means: worth
 # triaging as a finding. "review" means: cannot decide from the signature alone.
 _VERDICT = {
-    "ubsan-invalid-enum": ("shallow", "unvalidated enum cast; guard at the reader"),
-    "assertion-abort": ("shallow", "assertion reachable from input; DoS, often intended"),
+    "ubsan-invalid-enum": ("review", "unvalidated enum cast; requires target-specific review"),
+    "assertion-abort": ("review", "input-reachable abort; inspect DoS impact"),
     "ubsan-div-zero": ("review", "div-by-zero: real DoS but frequently already known"),
     "asan-fpe": ("review", "arithmetic fault (div-by-zero); real DoS, check prior art"),
     "ubsan-int-overflow": ("review", "integer overflow; may or may not be exploitable"),
@@ -262,14 +262,24 @@ def _iter_inputs(argv):
                     yield (f.name, f.read_text(errors="replace"))
         elif path.is_file():
             yield (path.name, path.read_text(errors="replace"))
+        else:
+            raise FileNotFoundError(f"report path does not exist: {path}")
 
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    buckets, unparsed = dedup(_iter_inputs(argv))
+    try:
+        reports = list(_iter_inputs(argv))
+    except OSError as e:
+        print(f"triage input error: {e}", file=sys.stderr)
+        return 1
+    if not reports:
+        print("no reports supplied; campaign success must be established by the campaign runner")
+        return 1
+    buckets, unparsed = dedup(reports)
     print(format_table(buckets, unparsed))
-    # exit non-zero if any 'real' bucket exists, so CI can gate on it
-    return 1 if any(classify(b.signature)[0] == "real" for b in buckets) else 0
+    # Every fault needs review. There are currently no allowlisted blockers.
+    return 1 if unparsed or buckets else 0
 
 
 if __name__ == "__main__":

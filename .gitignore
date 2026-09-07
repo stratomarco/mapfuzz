@@ -34,3 +34,7 @@ __pycache__/
 # continuous-fuzz working corpus (accumulated, cached in CI, not committed)
 targets/*/corpus_run/
 targets/*/corpus_min/
+
+# Local qualification environments and campaign reports
+.runs/
+.venv*/

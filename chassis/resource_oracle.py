@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import argparse
 import multiprocessing as mp
-import os
+import math
 import resource
 import sys
 from typing import Any, Callable
@@ -39,25 +39,25 @@ REJECTED = "rejected"     # loader raised (a clean, fast rejection: good)
 EXHAUSTED = "exhausted"   # loader hit the memory cap (MemoryError under RLIMIT_AS)
 
 
-def _child(mem_bytes: int, fn: Callable[..., Any], args: tuple, q: mp.Queue) -> None:
+def _child(mem_bytes: int, fn: Callable[..., Any], args: tuple, q) -> None:
     # Apply an address-space cap so an unbounded allocation raises MemoryError
     # (or is killed) instead of exhausting the host.
     try:
         resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
     except (ValueError, OSError):
         # If we cannot set the cap, report so the caller does not misread the run.
-        q.put(("nocap", None))
+        q.send(("nocap", None))
         return
     try:
         fn(*args)
-        q.put((OK, None))
+        q.send((OK, None))
     except MemoryError:
-        q.put((EXHAUSTED, "MemoryError"))
+        q.send((EXHAUSTED, "MemoryError"))
     except RecursionError as e:
         # A catchable fast failure. Treated as a rejection, not exhaustion.
-        q.put((REJECTED, "RecursionError: %s" % e))
+        q.send((REJECTED, "RecursionError: %s" % str(e)[:512]))
     except Exception as e:  # noqa: BLE001 - any clean raise is a rejection
-        q.put((REJECTED, "%s: %s" % (type(e).__name__, e)))
+        q.send((REJECTED, "%s: %s" % (type(e).__name__[:128], str(e)[:512])))
 
 
 def run_capped(
@@ -74,20 +74,38 @@ def run_capped(
       EXHAUSTED - hit the memory cap (an unbounded allocation)
       "timeout" - exceeded the wall-clock timeout (an unbounded loop)
       "nocap"   - the memory cap could not be applied (inconclusive)
+      "child-error" - abnormal exit or no result; cause unconfirmed
     """
+    if type(mem_mb) is not int or mem_mb <= 0 or not math.isfinite(timeout_s) or timeout_s <= 0:
+        raise ValueError("memory and time caps must be positive")
     ctx = mp.get_context("spawn")
-    q: mp.Queue = ctx.Queue()
-    p = ctx.Process(target=_child, args=(mem_mb * 1024 * 1024, fn, args, q))
-    p.start()
-    p.join(timeout_s)
-    if p.is_alive():
-        p.terminate()
-        p.join()
-        return ("timeout", "exceeded %.1fs" % timeout_s)
-    if not q.empty():
-        return q.get()
-    # Process died without reporting (e.g. OS-killed on the cap): treat as exhausted.
-    return (EXHAUSTED, "child exited without result (likely OOM-killed)")
+    receiver, sender = ctx.Pipe(duplex=False)
+    p = ctx.Process(target=_child, args=(mem_mb * 1024 * 1024, fn, args, sender))
+    try:
+        p.start()
+        sender.close()
+        p.join(timeout_s)
+        if p.is_alive():
+            p.kill()
+            p.join()
+            return ("timeout", "wall-clock limit exceeded")
+        if p.exitcode != 0:
+            return ("child-error", f"child exit code {p.exitcode}; cause unconfirmed")
+        if receiver.poll():
+            try:
+                return receiver.recv()
+            except EOFError:
+                pass
+        return ("child-error", "child exited without a result; cause unconfirmed")
+    finally:
+        sender.close()
+        receiver.close()
+        if p.pid is not None:
+            if p.is_alive():
+                p.kill()
+                p.join()
+            p.close()
+
 
 
 def assert_guards_class(
@@ -96,22 +114,22 @@ def assert_guards_class(
     benign: bytes,
     mem_mb: int = 512,
     timeout_s: float = 5.0,
+    *,
+    allow_bomb_ok: bool = False,
 ) -> list[str]:
     """Assert the loader guards the declared-huge class for one (bomb, benign) pair.
 
     A correctly-bounded loader REJECTS the bomb fast (REJECTED) and accepts the
-    benign input (OK). Returns a list of failure strings (empty means pass).
+    benign input (OK). Set allow_bomb_ok=True only for a loader whose documented
+    contract safely ignores the hostile declaration. Returns failures. A rejected
+    exception is only a resource outcome, not proof of semantically correct rejection.
     """
     failures: list[str] = []
 
     b_outcome, b_detail = run_capped(loader, bomb, mem_mb=mem_mb, timeout_s=timeout_s)
-    if b_outcome in (EXHAUSTED, "timeout"):
-        failures.append(
-            "bomb was NOT bounded: outcome=%s (%s). The loader consumed unbounded "
-            "resources on a crafted input." % (b_outcome, b_detail)
-        )
-    elif b_outcome == "nocap":
-        failures.append("inconclusive: memory cap could not be applied")
+    allowed = (REJECTED, OK) if allow_bomb_ok else (REJECTED,)
+    if b_outcome not in allowed:
+        failures.append(f"bomb outcome={b_outcome} ({b_detail}); expected {allowed}")
 
     g_outcome, g_detail = run_capped(loader, benign, mem_mb=mem_mb, timeout_s=timeout_s)
     if g_outcome != OK:
@@ -138,9 +156,8 @@ def _unbounded_loop_loader(data: bytes) -> None:
     # Stand-in for the declared-huge ITERATION class (like gguf-py 0008): loop a
     # declared count doing work, with no bound.
     declared = int.from_bytes(data[:8], "little") if len(data) >= 8 else 0
-    acc = []
-    for i in range(declared):
-        acc.append(i)  # unbounded time+memory
+    for _ in range(declared):
+        pass  # constant memory: tests time independently of allocation
 
 
 def _bounded_loader(data: bytes) -> None:
@@ -158,19 +175,13 @@ def _selftest() -> int:
 
     failures: list[str] = []
 
-    # 1. The oracle must CATCH an unbounded-allocation loader (bomb not bounded).
-    f = assert_guards_class(_unbounded_alloc_loader, huge, benign)
-    if not f:
-        failures.append("oracle FAILED to flag the unbounded-allocation loader")
-    else:
-        print("ok: unbounded-allocation loader correctly flagged (%s)" % f[0][:50])
-
-    # 2. The oracle must CATCH an unbounded-loop loader (timeout).
-    f = assert_guards_class(_unbounded_loop_loader, huge, benign, timeout_s=3.0)
-    if not f:
-        failures.append("oracle FAILED to flag the unbounded-loop loader")
-    else:
-        print("ok: unbounded-loop loader correctly flagged (%s)" % f[0][:50])
+    for loader, expected in ((_unbounded_alloc_loader, EXHAUSTED),
+                             (_unbounded_loop_loader, "timeout")):
+        actual, detail = run_capped(loader, huge, timeout_s=1.0)
+        if actual != expected:
+            failures.append(f"expected {expected}, got {actual}: {detail}")
+        else:
+            print(f"ok: independently detected {expected}")
 
     # 3. The oracle must PASS a correctly-bounded loader (no failures).
     f = assert_guards_class(_bounded_loader, huge, benign)

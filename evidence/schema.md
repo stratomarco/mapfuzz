@@ -27,6 +27,8 @@ marked (req).
   - `source-read:<path/detail>`   read from primary source
   - `sandbox-run:<detail>`        executed in Claude's sandbox
   - `machine-run:<detail>`        executed on the researcher's machine
+  - `execution-run:<detail>`      historical execution with environment unrecorded
+  - `environment:<detail>`        version/environment context, not execution evidence
   - `claim:<id>`                  derived from another claim
 - `observation` (req): the raw result, verbatim where load-bearing (run counts,
   exit codes, coverage, trace lines, source quotes).
@@ -47,3 +49,18 @@ marked (req).
   no crash in release").
 - Provenance tags distinguish sandbox from on-machine runs, because they have
   different weight (sandbox cannot install torch; on-machine ran 23M+ campaigns).
+
+## Validation boundary
+
+The validator enforces structure, types, calendar dates, identifiers, enums,
+nonempty required strings and provenance, and claim/supersession references.
+Duplicate YAML keys and unknown fields are errors. `severity` is restricted to
+the glossary values and is omitted outside findings/non-findings. Optional
+`refs` is a list of nonempty strings; private references need not exist publicly.
+Rendering always validates first.
+
+Truth, adequacy of reproduction, quantified effort/environment for negatives,
+and the explanation for excluding a non-finding require human review. Keyword
+checks cannot prove these rules. A successful check is not a truth certificate.
+Legacy `execution-run` entries preserve evidence without guessing which machine
+ran it. `environment` alone never establishes that a test ran.

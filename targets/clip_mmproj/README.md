@@ -1,7 +1,10 @@
 # CLIP/mmproj qualification target
 
-Status: **CHANGES-REQUIRED**. M0 found a current public-coverage gap and the
-synthetic control reached real tensor reads plus bounded CLIP graph construction.
+Portfolio lifecycle: **qualified locally; parked**. The review packet disposition
+remains **CHANGES-REQUIRED** because the first bounded mutation batch found a
+candidate and triggered the stop rule. M0 found a current public-coverage gap,
+and the synthetic control reached real tensor reads plus bounded CLIP graph
+construction.
 The first 60-second smoke batch then produced a reproducible ASan null-read
 candidate, so campaign expansion stopped. Batches 2 and 3 were not run. This is
 not a novelty, exploitability, or impact determination. A subsequent local,
@@ -9,9 +12,11 @@ layout-aware validation patch converts the retained crash to a pre-read
 rejection while preserving the supported Yi-style MLP layout. The fix has not
 been proposed upstream. An independent 2026-09-08 review accepted the fix for
 the observed path after replaying both layouts and the retained private input.
-The same standalone fix was then built and replayed locally against upstream
-master `df750f76bb6126566621803b69ddaeb993be5b08` on 2026-09-09 with the same
-expected outcomes. No pull request was opened.
+The same fix was then built and replayed locally against upstream master
+`df750f76bb6126566621803b69ddaeb993be5b08` on 2026-09-09 with the separate
+qualification patches present and the same expected outcomes. The fix alone
+also passed `git apply --check` against pristine current master but was not
+compiled alone. No pull request was opened.
 
 The earlier `harness/` prototype remains historical. It uses `no_alloc=true`, a
 metadata-only seed and broad exception catches, so it does not establish tensor
@@ -98,9 +103,8 @@ targets/clip_mmproj/run_smoke.sh \
   .runs/clip-mmproj-review-smoke/batch1
 ```
 
-Do not run further mutation batches while the review disposition is
-CHANGES-REQUIRED. The retained private input stays under ignored `.runs/`; it is
-not part of the review diff.
+Do not run further mutation batches while this target is parked. The retained
+private input stays under ignored `.runs/`; it is not part of the review diff.
 
 ## Surface limits
 

@@ -3,6 +3,11 @@ import ast
 from pathlib import Path
 import subprocess
 
+try:
+    from .qualification_manifest import validate_manifest
+except ImportError:  # Direct execution: python3 chassis/check_repository.py
+    from qualification_manifest import validate_manifest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -23,7 +28,12 @@ def main():
     for target in targets:
         assert f"| {target} |" in inventory, f"missing target inventory: {target}"
         assert (ROOT / "targets" / target / "README.md").is_file(), target
-    print(f"syntax checked for {count} Python files and tracked shell scripts; {len(targets)} targets inventoried")
+    manifest = validate_manifest()
+    assert len(manifest["targets"]) == len(targets)
+    print(
+        f"syntax checked for {count} Python files and tracked shell scripts; "
+        f"{len(targets)} targets inventoried and qualification-manifest checked"
+    )
 
 
 if __name__ == "__main__":

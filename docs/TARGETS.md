@@ -1,21 +1,41 @@
 # mapfuzz target status
 
-Reviewed against the tracked checkout on 2026-09-07. Historical findings remain
-in the evidence ledger; status here controls future compute, not attribution.
-No target is currently promoted to automatic campaigns. Infrastructure and locked differential regression CI run
-on push/PR. This is not a claim of suite-wide continuous fuzzing.
+Reviewed against the tracked checkout on 2026-09-09. Historical findings remain
+in the evidence ledger; lifecycle and compute decisions here control future work,
+not attribution. No target is promoted to automatic campaigns. Infrastructure
+and locked differential regression CI run on push/PR; this is not a claim of
+suite-wide continuous fuzzing.
 
-| Directory | Status | Tracked surface and next gate |
-|---|---|---|
-| clip_mmproj | candidate, build incomplete | Metadata harness and seed generator; `no_alloc=true`. Establish pinned build and tensor-carrying seed reaching materialization before a depth campaign. |
-| tokenizers | regression maintenance, build qualification pending | Rust from_bytes and Python stable generator; six JSON seeds. Exact crate pin; record dated nightly and cargo-fuzz version, resolve/commit dependency lock, and rerun seed regression before promotion. Private regressions remain local. |
-| gguf | paused | Pinned C++ metadata/descriptor parser with no_alloc=true and one GGUF seed. Keep as historical calibration; allocation behavior is untested here. |
-| gguf_py_reader | archived as mapped | Python reader harness and seed generator. Historical environment and negative campaign are not a complete tracked reproduction package. Reopen after meaningful upstream changes. |
-| pytorch | paused | Exactly two tracked harnesses: fuzz_weights_only.py and fuzz_rebuild_args_stable.py. Deep storage/container harnesses mentioned historically are absent. Restore provenance-backed sources, exact environment and native reachability before promotion. |
-| transformers_config | retired | Generates dictionaries and round-trips its own JSON through base PretrainedConfig. Does not fuzz malformed JSON or model-specific validation. |
-| flax_checkpoint | paused | msgpack_restore and from_state_dict; three msgpack seeds. Exact environment and semantic coverage required before any return. |
-| minja_template | archived for llama.cpp work | Historical google/minja parser/render harnesses and three template seeds. Does not represent llama.cpp's newer engine; build now requires immutable dependency revisions. |
-| tokenizers_differential | locked regression; campaigns paused | One small WordPiece pairing and 15 baseline probes, CPython 3.10.12 Linux x86_64 wheel-hash lock. Richer feature matrix and semantic coverage still required. Correctness divergence does not establish a security bypass. |
+The machine-checked source for lifecycle, last M0, consumer boundary, controls,
+evidence paths and compute decision is `targets/qualification.yaml`.
+
+| Directory | Lifecycle | Last M0 | Semantic milestone | Compute decision and next gate |
+|---|---|---|---|---|
+| clip_mmproj | qualified locally; parked | 2026-09-09 | Standard and Yi tensor bytes are synchronously read and a CPU vision consumer is constructed; incomplete standard MLP rejects before reads. | Parked. No more mutations. Maintainer may later choose the local normal hardening PR draft through official channels. |
+| tokenizers | regression maintenance | 2026-08-13; historical, refresh required | Valid seeds exercise `Tokenizer::from_bytes`; breadth across named component families is not yet measured. | Regression only. Refresh M0 and pin dated Rust/cargo-fuzz plus the complete dependency lock before qualification compute. |
+| gguf | paused | not current | Metadata and descriptors only under `no_alloc=true`; allocation and a downstream consumer remain unproved. | No compute. Refresh M0 and prove a named consumer with controls. |
+| gguf_py_reader | archived | not current | Valid-seed acceptance and downstream consumer reach are not tracked. | No compute. Reopen only after meaningful upstream changes with exact pins and controls. |
+| pytorch | paused | not current | Restricted-unpickler/meta-tensor paths exist; native storage reach remains unproved. | No compute. Recover provenance-backed deep harnesses, lock the environment and refresh M0. |
+| transformers_config | retired | not current | Self-generated base-config round trips do not reach malformed JSON or model-specific validation. | No compute. Replace with a newly scoped target rather than extend this generator. |
+| flax_checkpoint | paused | not current | Historical msgpack and structural paths lack a current locked environment and semantic controls. | No compute. Refresh M0/environment and prove accepted inputs plus named structural states. |
+| minja_template | archived | not current | Historical google/minja parser/render reach does not establish current llama.cpp Jinja reach. | No compute. Run current llama.cpp M0 only if a concrete public-coverage gap is identified. |
+| tokenizers_differential | regression maintenance | not current | Fifteen locked WordPiece probes agree; broader Unicode/subword states remain unqualified. | Regression only. Refresh M0, widen matched configurations and add accepted-input/state metrics before campaigns. |
+
+## Lifecycle meanings
+
+- **Regression maintenance:** run deterministic locked regression checks only;
+  fuzz campaigns need a new M0 and promotion decision.
+- **M0 candidate:** source and public-coverage reconnaissance only. Build or fuzz
+  compute is not authorized until M0 identifies a defensible consumer boundary.
+- **Paused:** preserve tracked work, but spend no compute until the named
+  prerequisite is repaired.
+- **Archived:** bounded historical result retained to prevent rediscovery; reopen
+  only after a meaningful external or scope change.
+- **Retired:** the target design does not reach the intended surface. Do not
+  revive it incrementally.
+- **Qualified locally; parked:** build and semantic reachability are locally
+  reproducible, but the recorded stop rule forbids additional mutation. This is
+  not a vulnerability, novelty, upstream-fix or publication claim.
 
 ## Promotion contract
 
@@ -29,6 +49,13 @@ on push/PR. This is not a claim of suite-wide continuous fuzzing.
    exit status, logs, accepted-input rate and semantic reach.
 5. Promote only after fresh-environment reproduction. Continue while new target
    functions/states are reached; otherwise archive a bounded negative.
+
+The shared qualification defaults are one CPU worker, a hard 4 GiB resident
+memory ceiling, zero swap, five seconds per input, 60 seconds per batch and a
+90-second outer deadline. A package may tighten these values but must not loosen
+them without a separately reviewed brief. Required counters, controls and stop
+rules are defined in `targets/qualification.yaml` and checked by
+`chassis/qualification_manifest.py`.
 
 Do not reconstruct absent private reproducers from public descriptions merely to
 make an inventory complete. Public checkout reproducibility and private finding

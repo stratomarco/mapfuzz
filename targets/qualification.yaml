@@ -1,0 +1,149 @@
+schema_version: 1
+
+qualification_contract:
+  caps:
+    cpu_workers: 1
+    memory_bytes: 4294967296
+    swap_bytes: 0
+    input_timeout_seconds: 5
+    campaign_seconds: 60
+    outer_timeout_seconds: 90
+  semantic_counters:
+    - attempted inputs
+    - accepted inputs
+    - inputs reaching the named consumer milestone
+    - new named states or functions
+  negative_controls:
+    - malformed input rejected before the consumer milestone
+    - missing or truncated payload distinguished from metadata success
+    - timeout, abnormal exit, sanitizer fault, and resource failure remain visible
+  stop_rules:
+    - stop at M0 when no useful uncovered consumer boundary is demonstrated
+    - stop on the first new fault and retain the reproducer only in ignored local storage
+    - stop after three equal bounded batches with no new named state or function
+    - never extend compute based only on execution count or aggregate coverage
+
+targets:
+  - id: clip_mmproj
+    lifecycle: qualified-parked
+    last_m0: "2026-09-09"
+    consumer: mtmd_init_from_file to clip_init, tensor reads, and CPU vision-MLP graph construction
+    trust_boundary: untrusted GGUF projector loaded by a supported multimodal consumer
+    semantic_milestone: 12 standard or 16 Yi tensor reads followed by non-null consumer construction
+    compute_decision: parked
+    next_gate: maintainer decision on the local hardening PR draft; no more mutation without a separate depth brief
+    controls:
+      - unsupported projector rejected before reads
+      - missing required tensor rejected before reads
+      - incomplete standard MLP rejected before reads
+      - complete Yi MLP constructs the consumer
+    evidence:
+      - docs/qualification/clip-mmproj.md
+      - targets/clip_mmproj/README.md
+
+  - id: tokenizers
+    lifecycle: regression-maintenance
+    last_m0: "2026-08-13"
+    consumer: tokenizers Tokenizer::from_bytes deserialization and construction
+    trust_boundary: untrusted tokenizer.json bytes loaded by an application
+    semantic_milestone: valid seeds construct tokenizer models across named model and component families
+    compute_decision: regression-only
+    next_gate: refresh current M0, pin dated Rust and cargo-fuzz tools, and commit a reviewed dependency lock
+    controls: []
+    evidence:
+      - targets/tokenizers/README.md
+      - docs/TARGETS.md
+
+  - id: gguf
+    lifecycle: paused
+    last_m0: not-current
+    consumer: gguf_init_from_buffer metadata and tensor-descriptor parsing with no_alloc enabled
+    trust_boundary: untrusted GGUF model container loaded by a native consumer
+    semantic_milestone: actual allocation or downstream tensor consumer remains unproved
+    compute_decision: none
+    next_gate: refresh M0 and prove allocation or a named downstream consumer with positive and negative controls
+    controls: []
+    evidence:
+      - targets/gguf/README.md
+      - docs/TARGETS.md
+
+  - id: gguf_py_reader
+    lifecycle: archived
+    last_m0: not-current
+    consumer: llama.cpp gguf-py reader over a generated GGUF file
+    trust_boundary: untrusted GGUF file opened by the Python reader
+    semantic_milestone: valid-seed acceptance and downstream consumer reach are not tracked
+    compute_decision: none
+    next_gate: reopen only after meaningful upstream changes with exact pins, a tracked seed, and consumer controls
+    controls: []
+    evidence:
+      - targets/gguf_py_reader/README.md
+      - docs/TARGETS.md
+
+  - id: pytorch
+    lifecycle: paused
+    last_m0: not-current
+    consumer: torch restricted weights-only unpickler and selected rebuild arguments
+    trust_boundary: untrusted checkpoint loaded with weights_only enabled
+    semantic_milestone: a valid seed reaching a named native storage consumer remains unproved
+    compute_decision: none
+    next_gate: recover provenance-backed deep harnesses, lock the environment, refresh M0, and prove native reachability
+    controls: []
+    evidence:
+      - targets/pytorch/README.md
+      - docs/TARGETS.md
+
+  - id: transformers_config
+    lifecycle: retired
+    last_m0: not-current
+    consumer: base PretrainedConfig dictionary construction and self-generated JSON round trip
+    trust_boundary: robustness-only configuration parsing with code-execution-adjacent keys excluded
+    semantic_milestone: malformed JSON and model-specific validation are not reached by the tracked generator
+    compute_decision: none
+    next_gate: none; replace with a new scoped target rather than extending this generator
+    controls: []
+    evidence:
+      - targets/transformers_config/README.md
+      - docs/TARGETS.md
+
+  - id: flax_checkpoint
+    lifecycle: paused
+    last_m0: not-current
+    consumer: flax msgpack restore and from_state_dict structural reconciliation
+    trust_boundary: untrusted JAX or Flax checkpoint restored into an application state tree
+    semantic_milestone: current locked-environment array and structural controls are unavailable
+    compute_decision: none
+    next_gate: establish exact environment and current M0, then prove accepted inputs and named structural states
+    controls: []
+    evidence:
+      - targets/flax_checkpoint/README.md
+      - docs/TARGETS.md
+
+  - id: minja_template
+    lifecycle: archived
+    last_m0: not-current
+    consumer: historical google/minja parser and renderer, not current llama.cpp Jinja
+    trust_boundary: untrusted model-supplied chat template parsed and rendered at inference time
+    semantic_milestone: current llama.cpp parser and runtime reachability are not established
+    compute_decision: none
+    next_gate: current llama.cpp M0 only if public targets leave a demonstrated parser or runtime path uncovered
+    controls: []
+    evidence:
+      - targets/minja_template/README.md
+      - docs/TARGETS.md
+
+  - id: tokenizers_differential
+    lifecycle: regression-maintenance
+    last_m0: not-current
+    consumer: paired slow and fast BERT WordPiece tokenization under a locked Python environment
+    trust_boundary: differential correctness over decoded input, not arbitrary tokenizer configuration loading
+    semantic_milestone: fifteen baseline probes agree; broader Unicode and subword states remain unqualified
+    compute_decision: regression-only
+    next_gate: refresh M0 and add matched configurations, Unicode structure, accepted-input counts, and named states
+    controls:
+      - equal exceptions cannot satisfy the baseline gate
+      - exception types remain distinct
+      - invalid UTF-8 bytes are preserved through Latin-1 mapping
+    evidence:
+      - targets/tokenizers_differential/README.md
+      - docs/TARGETS.md

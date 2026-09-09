@@ -5,6 +5,13 @@ latest CI run is green; this planning pass did not independently query GitHub.
 The hardening branch is not assumed merged. This roadmap authorizes no merge,
 publication, upstream contact or long campaign by itself.
 
+Execution checkpoint, 2026-09-09: the CLIP pilot is locally checkpointed at
+`ff8d51e1149a35b930ba6e13b3f105001deaca75`. M0, two pinned builds, semantic
+controls, one bounded batch, local fix validation, a current-master port and
+independent review are complete. The first mutation batch found a candidate and
+triggered the mandatory stop. The target and local PR draft are parked; nothing
+was pushed, opened, published or sent upstream.
+
 ## Working agreement
 
 The planning/review task owns priorities, acceptance criteria and independent
@@ -23,18 +30,19 @@ Reference documents:
 - [Implemented hardening and its limits](HARDENING-2026-09-07.md)
 - [Daybreak pilot brief](tasks/DAYBREAK-CLIP-QUALIFICATION.md)
 - [Independent review template](tasks/RESEARCH-REVIEW-TEMPLATE.md)
+- Machine-checked target portfolio: `targets/qualification.yaml`
 
 ## Delivery order
 
-| ID | Work package | Dependency | Reviewable outcome | Exit condition |
-|---|---|---|---|---|
-| R0 | Close the hardening review | Existing branch | Reviewed exact-head diff and CI evidence; baseline recorded | Merge only through maintainer workflow; otherwise use the explicitly approved branch base |
-| R1 | CLIP/mmproj current M0 | R0 base selected | Pinned upstream/OSS-Fuzz source inventory, consumer map and coverage comparison | Continue only with an identified useful gap; otherwise return a documented duplicate/uncertain result |
-| R2 | Reproducible CLIP build | R1 passes | CPU instrumented build, exact dependency/toolchain record and fresh-build replay | Both builds exercise the real selected loader; unresolved prerequisites are reported |
-| R3 | Valid seed and semantic reachability | R2 | Deterministic tensor-carrying seed, milestone probes and negative controls | Actual tensor bytes consumed and bounded consumer construction proved; metadata-only success does not pass |
-| R4 | Short qualification runs | R3 | Capped smoke results, failure-path tests, semantic counters and resource measurements | Qualification decision, not automatic promotion to long fuzzing |
-| R5 | Independent review and disposition | R1-R4 report | Replayed critical evidence and reviewed diff | Accept qualification, request changes, or park the target |
-| R6 | Depth campaign or next M0 | R5 | Separately scoped task with compute budget | Continue only with measurable new semantic reach |
+| ID | State | Work package | Reviewable outcome and exit |
+|---|---|---|---|
+| R0 | complete for the local pilot | Close the hardening review | Approved base `5e52993`; no merge was inferred or performed. |
+| R1 | complete | CLIP/mmproj current M0 | Useful public-coverage gap and actual multimodal consumer boundary identified. |
+| R2 | complete | Reproducible CLIP build | Two pinned fresh builds plus a 2026-09-09 current-master build exercised the real loader. |
+| R3 | complete | Valid seed and semantic reachability | Tensor bytes were read; standard/Yi consumers constructed; negative controls failed earlier. |
+| R4 | stopped as designed | Short qualification runs | Batch 1 found an ASan null-read candidate; batches 2 and 3 were not run. |
+| R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
+| R6 | parked for CLIP; next M0 selected | Depth campaign or next M0 | No CLIP depth compute. Run bounded ExecuTorch M0 and stop unless it demonstrates uncovered consumer reachability. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -104,20 +112,26 @@ until their own evidence satisfies the contract.
 
 These are candidates for future source verification, not verified-current gaps:
 
-1. CLIP depth: only if the pilot demonstrates useful uncovered materialization.
-   Design structure-preserving mutations around the demonstrated seed. Define
-   semantic states before spending compute. After three equal-duration batches
-   with no new named states/functions, stop and review the instrumentation and
-   mutation strategy; do not extend merely to raise execution counts.
+1. ExecuTorch: short M0 on `Program::load`, program/segment loading and
+   verification modes. First establish the current documented contracts and
+   exact consumer boundary; disagreement alone is not a defect. Stop before a
+   build if public coverage duplicates it or prerequisites cannot be pinned.
 2. stable-diffusion.cpp: short M0 on tensor-name/shape/type reconciliation with
    consumers and companion artifacts. Avoid duplicating generic container work.
-3. ExecuTorch: short M0 on program/segment loading and verification modes. First
-   establish their documented contracts; disagreement alone is not a defect.
-4. Current llama.cpp Jinja: proceed only if existing fuzz targets leave a
+3. Current llama.cpp Jinja: proceed only if existing fuzz targets leave a
    demonstrated parser/runtime/resource path unexercised.
-5. LeRobot composition: revisit manifest/schema/dataset relationships only if
+4. LeRobot composition: revisit manifest/schema/dataset relationships only if
    current source supplies a concrete boundary. World-model runtimes need custom
    parsing beyond delegated checkpoint and codec libraries.
+5. CLIP depth remains parked. Reopen only under a separate brief after the local
+   finding/fix disposition is decided and only with named semantic states; never
+   extend merely to raise execution counts.
+
+Candidate M0s produce a review packet under `docs/qualification/` before a new
+target directory is created. A passing M0 must then add a manifest entry with
+the exact consumer, trust boundary, semantic milestone, controls, evidence and
+compute decision. A duplicate, uncertain boundary or missing immutable
+prerequisite is an `M0-STOP`, not an invitation to switch targets silently.
 
 Tokenizers remains regression maintenance; its Rust build needs a reviewed lock
 and toolchain qualification. PyTorch remains paused while deep sources and native

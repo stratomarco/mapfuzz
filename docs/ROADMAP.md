@@ -42,7 +42,7 @@ Reference documents:
 | R3 | complete | Valid seed and semantic reachability | Tensor bytes were read; standard/Yi consumers constructed; negative controls failed earlier. |
 | R4 | stopped as designed | Short qualification runs | Batch 1 found an ASan null-read candidate; batches 2 and 3 were not run. |
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
-| R6 | CLIP parked; ExecuTorch M0 stopped | Depth campaign or next M0 | ExecuTorch has a real consumer, but official records show historical internal fuzz discoveries and later planning while the harness, coverage and current operation remain unavailable. No build/fuzz compute; next candidate requires explicit selection. |
+| R6 | CLIP parked; ExecuTorch and stable-diffusion.cpp M0s stopped | Depth campaign or next M0 | Both candidates have real consumers, but existing fuzz work or same-boundary prior art cannot be compared with an available harness and coverage map. No build/fuzz compute; next candidate requires explicit selection. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -118,8 +118,14 @@ These are candidates for future source verification, not verified-current gaps:
    coverage and current operation remain unavailable.
    Public-tree and OSS-Fuzz absence cannot establish an uncovered boundary. See
    `qualification/executorch-m0.md`; do not allocate build or fuzz compute.
-2. stable-diffusion.cpp: short M0 on tensor-name/shape/type reconciliation with
-   consumers and companion artifacts. Avoid duplicating generic container work.
+2. stable-diffusion.cpp: **M0-STOP on 2026-09-09.** Current source establishes
+   tensor-name/shape/type reconciliation across real consumers and companion
+   artifacts. Official records also document fuzz-derived malformed-model faults,
+   an open ASan-confirmed safetensors shape-product issue with an open fix, and
+   current name/shape reconciliation failures. The actual existing fuzz harness,
+   corpus and coverage are unavailable, so the proposed work is neither proved
+   duplicate nor proved uncovered. See `qualification/stable-diffusion-m0.md`;
+   do not allocate build or fuzz compute.
 3. Current llama.cpp Jinja: proceed only if existing fuzz targets leave a
    demonstrated parser/runtime/resource path unexercised.
 4. LeRobot composition: revisit manifest/schema/dataset relationships only if

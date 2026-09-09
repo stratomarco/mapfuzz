@@ -42,7 +42,7 @@ Reference documents:
 | R3 | complete | Valid seed and semantic reachability | Tensor bytes were read; standard/Yi consumers constructed; negative controls failed earlier. |
 | R4 | stopped as designed | Short qualification runs | Batch 1 found an ASan null-read candidate; batches 2 and 3 were not run. |
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
-| R6 | parked for CLIP; next M0 selected | Depth campaign or next M0 | No CLIP depth compute. Run bounded ExecuTorch M0 and stop unless it demonstrates uncovered consumer reachability. |
+| R6 | CLIP parked; ExecuTorch M0 stopped | Depth campaign or next M0 | ExecuTorch has a real consumer, but official records show historical internal fuzz discoveries and later planning while the harness, coverage and current operation remain unavailable. No build/fuzz compute; next candidate requires explicit selection. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -112,10 +112,12 @@ until their own evidence satisfies the contract.
 
 These are candidates for future source verification, not verified-current gaps:
 
-1. ExecuTorch: short M0 on `Program::load`, program/segment loading and
-   verification modes. First establish the current documented contracts and
-   exact consumer boundary; disagreement alone is not a defect. Stop before a
-   build if public coverage duplicates it or prerequisites cannot be pinned.
+1. ExecuTorch: **M0-STOP on 2026-09-09.** Current `Program::load`, segment and
+   verification contracts were established, but official project records show
+   historical internal fuzz discoveries and later planning while the harness,
+   coverage and current operation remain unavailable.
+   Public-tree and OSS-Fuzz absence cannot establish an uncovered boundary. See
+   `qualification/executorch-m0.md`; do not allocate build or fuzz compute.
 2. stable-diffusion.cpp: short M0 on tensor-name/shape/type reconciliation with
    consumers and companion artifacts. Avoid duplicating generic container work.
 3. Current llama.cpp Jinja: proceed only if existing fuzz targets leave a

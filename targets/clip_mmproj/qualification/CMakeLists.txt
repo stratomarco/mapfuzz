@@ -1,0 +1,40 @@
+cmake_minimum_required(VERSION 3.16)
+project(mapfuzz_clip_mmproj_qualification LANGUAGES C CXX)
+
+if(NOT DEFINED LLAMA_SOURCE_DIR)
+    message(FATAL_ERROR "LLAMA_SOURCE_DIR must name the pinned llama.cpp checkout")
+endif()
+
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+set(GGML_CCACHE OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_MTMD ON CACHE BOOL "" FORCE)
+set(LLAMA_CURL OFF CACHE BOOL "" FORCE)
+set(LLAMA_SANITIZE_ADDRESS ON CACHE BOOL "" FORCE)
+
+add_compile_options(-fno-omit-frame-pointer -fprofile-instr-generate -fcoverage-mapping)
+add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+
+add_subdirectory("${LLAMA_SOURCE_DIR}" llama.cpp-build EXCLUDE_FROM_ALL)
+
+add_executable(clip-mmproj-seed generate_seed.cpp)
+target_link_libraries(clip-mmproj-seed PRIVATE ggml)
+target_compile_features(clip-mmproj-seed PRIVATE cxx_std_17)
+
+add_executable(clip-mmproj-qualify qualify_clip.cpp)
+target_link_libraries(clip-mmproj-qualify PRIVATE mtmd)
+target_include_directories(clip-mmproj-qualify PRIVATE "${LLAMA_SOURCE_DIR}/tools/mtmd")
+target_compile_features(clip-mmproj-qualify PRIVATE cxx_std_17)
+
+add_executable(fuzz-clip-materialize fuzz_clip_materialize.cpp)
+target_link_libraries(fuzz-clip-materialize PRIVATE mtmd)
+target_include_directories(fuzz-clip-materialize PRIVATE "${LLAMA_SOURCE_DIR}/tools/mtmd")
+target_compile_features(fuzz-clip-materialize PRIVATE cxx_std_17)
+target_compile_options(fuzz-clip-materialize PRIVATE -fsanitize=fuzzer,address)
+target_link_options(fuzz-clip-materialize PRIVATE -fsanitize=fuzzer,address)

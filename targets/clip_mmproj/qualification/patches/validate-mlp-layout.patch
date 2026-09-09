@@ -1,0 +1,43 @@
+diff --git a/tools/mtmd/clip.cpp b/tools/mtmd/clip.cpp
+index dc7281f8b..d0ea8f3ae 100644
+--- a/tools/mtmd/clip.cpp
++++ b/tools/mtmd/clip.cpp
+@@ -2349,13 +2349,36 @@ struct clip_model_loader {
+                     model.mm_2_w = get_tensor(string_format(TN_LLAVA_PROJ, 2, "weight"), false);
+                     model.mm_2_b = get_tensor(string_format(TN_LLAVA_PROJ, 2, "bias"), false);
+                     // Yi-type llava
+                     model.mm_3_w = get_tensor(string_format(TN_LLAVA_PROJ, 3, "weight"), false);
+                     model.mm_3_b = get_tensor(string_format(TN_LLAVA_PROJ, 3, "bias"), false);
+                     model.mm_4_w = get_tensor(string_format(TN_LLAVA_PROJ, 4, "weight"), false);
+                     model.mm_4_b = get_tensor(string_format(TN_LLAVA_PROJ, 4, "bias"), false);
+-                    if (model.mm_3_w) {
+-                        // TODO: this is a hack to support Yi-type llava
++
++                    auto require_mlp_tensor = [&](const ggml_tensor * tensor, const char * name) {
++                        if (!tensor) {
++                            throw std::runtime_error(string_format(
++                                "%s: incomplete MLP projector: missing tensor %s\n", __func__, name));
++                        }
++                    };
++                    const bool has_yi_layout =
++                        model.mm_1_w || model.mm_1_b ||
++                        model.mm_3_w || model.mm_3_b ||
++                        model.mm_4_w || model.mm_4_b;
++                    if (has_yi_layout) {
++                        require_mlp_tensor(model.mm_0_w, "mm.0.weight");
++                        require_mlp_tensor(model.mm_0_b, "mm.0.bias");
++                        require_mlp_tensor(model.mm_1_w, "mm.1.weight");
++                        require_mlp_tensor(model.mm_1_b, "mm.1.bias");
++                        require_mlp_tensor(model.mm_3_w, "mm.3.weight");
++                        require_mlp_tensor(model.mm_3_b, "mm.3.bias");
++                        require_mlp_tensor(model.mm_4_w, "mm.4.weight");
++                        require_mlp_tensor(model.mm_4_b, "mm.4.bias");
+                         model.proj_type = PROJECTOR_TYPE_MLP_NORM;
++                    } else {
++                        require_mlp_tensor(model.mm_0_w, "mm.0.weight");
++                        require_mlp_tensor(model.mm_0_b, "mm.0.bias");
++                        require_mlp_tensor(model.mm_2_w, "mm.2.weight");
++                        require_mlp_tensor(model.mm_2_b, "mm.2.bias");
+                     }
+                     model.image_newline = get_tensor(TN_IMAGE_NEWLINE, false);
+                 } break;

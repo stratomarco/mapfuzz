@@ -1,0 +1,14 @@
+diff --git a/tools/mtmd/clip.cpp b/tools/mtmd/clip.cpp
+index dc7281f8b..4bb4a6606 100644
+--- a/tools/mtmd/clip.cpp
++++ b/tools/mtmd/clip.cpp
+@@ -4001,2 +4001,9 @@ struct clip_init_result clip_init(const char * fname, struct clip_context_params
++    } catch (const std::bad_alloc &) {
++        delete ctx_vision;
++        delete ctx_audio;
++        delete ctx_gen_audio;
++
++        // A fuzzer must observe allocation failure as a resource fault.
++        throw;
+     } catch (const std::exception & e) {
+         LOG_ERR("%s: failed to load model '%s': %s\n", __func__, fname, e.what());

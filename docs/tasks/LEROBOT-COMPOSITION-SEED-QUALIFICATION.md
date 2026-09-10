@@ -73,10 +73,11 @@ normal rejection. Temporary control copies must be cleaned up after tests.
 
 - CPU only; no GPU, video, network dataset, policy construction or training.
 - One seed, one episode, one frame and one `DataLoader` worker.
-- Each subprocess replay has a 30-second outer deadline. This includes cold
-  import time for the locked CUDA-enabled PyTorch wheel on the WSL-mounted
-  workspace; a measured exact-import probe exceeded 15 seconds. The complete
-  control suite has a 180-second outer deadline.
+- Each subprocess replay has a 60-second outer deadline. This includes cold
+  import, one-worker startup and shutdown for the locked CUDA-enabled PyTorch
+  wheel on the WSL-mounted workspace: exact import exceeded 15 seconds and the
+  first successful standalone consumer replay took 42.56 seconds. The complete
+  five-case control suite has a 360-second outer deadline.
 - Run no mutation campaign and report attempts/accepted/materialized counts as
   not applicable rather than zero fuzz inputs.
 - Stop immediately if the locked environment cannot be created, the positive

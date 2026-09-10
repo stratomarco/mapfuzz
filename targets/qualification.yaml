@@ -133,6 +133,25 @@ targets:
       - targets/minja_template/README.md
       - docs/TARGETS.md
 
+  - id: lerobot_composition
+    lifecycle: paused
+    last_m0: "2026-09-10"
+    consumer: LeRobotDatasetMetadata and DatasetReader through metadata-derived Parquet loading, row tensorization, task and optional video resolution, and one-worker training DataLoader consumption
+    trust_boundary: third-party or local LeRobot v3 dataset explicitly selected for training, evaluation, editing or visualization
+    semantic_milestone: metadata, tasks and episodes accepted; referenced data row materialized to tensors; episode and frame indices agree; task resolves; one-worker DataLoader yields the sample; video decoding is a later phase
+    compute_decision: none
+    next_gate: separately reviewed Python 3.12 plus uv.lock build-and-seed brief proving a minimal no-video composed sample and negative controls before video or mutation work
+    controls:
+      - invalid info or feature rank rejects before payload materialization
+      - missing or truncated episode and data shards remain distinct from metadata acceptance
+      - feature schema, episode bounds and task-index mismatches never count as a composed sample
+      - known public composition and timestamp cases are regression controls and dedup exclusions
+      - valid one-frame video and missing or out-of-tolerance video are a separate later gate
+    evidence:
+      - docs/qualification/lerobot-composition-m0.md
+      - targets/lerobot_composition/README.md
+      - docs/TARGETS.md
+
   - id: tokenizers_differential
     lifecycle: regression-maintenance
     last_m0: not-current

@@ -20,7 +20,7 @@ class QualificationManifestTests(unittest.TestCase):
 
     def test_repository_manifest(self):
         document = validate_manifest()
-        self.assertEqual(len(document["targets"]), 9)
+        self.assertEqual(len(document["targets"]), 10)
 
     def test_rejects_lifecycle_compute_mismatch(self):
         document = copy.deepcopy(self.document)

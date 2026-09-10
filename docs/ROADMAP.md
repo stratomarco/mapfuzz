@@ -42,7 +42,8 @@ Reference documents:
 | R3 | complete | Valid seed and semantic reachability | Tensor bytes were read; standard/Yi consumers constructed; negative controls failed earlier. |
 | R4 | stopped as designed | Short qualification runs | Batch 1 found an ASan null-read candidate; batches 2 and 3 were not run. |
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
-| R6 | CLIP parked; three candidate M0s stopped | Depth campaign or next M0 | ExecuTorch, stable-diffusion.cpp and current llama.cpp Jinja have real consumers, but existing fuzz work or same-boundary prior art prevents a defensible complementary-coverage claim. No build/fuzz compute; LeRobot requires explicit selection. |
+| R6 | LeRobot composition M0 qualified; compute paused | Next bounded package | Current source establishes an uncovered cross-file metadata/episode/Parquet/task/video boundary beyond Arrow/FFmpeg format fuzzing. Public same-boundary cases are dedup exclusions. No build/fuzz compute in M0. |
+| R7 | not authorized | LeRobot environment and semantic seed | Separate brief must lock Python 3.12+ from `uv.lock`, generate a tiny v3 bundle, and prove metadata→episode→data→task→one-worker DataLoader reach before any video or mutation phase. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -135,9 +136,16 @@ These are candidates for future source verification, not verified-current gaps:
    complementary coverage or avoid known rediscovery without the existing
    harness/corpus/coverage map. See `qualification/llama-jinja-m0.md`; do not
    allocate build or fuzz compute.
-4. LeRobot composition: revisit manifest/schema/dataset relationships only if
-   current source supplies a concrete boundary. World-model runtimes need custom
-   parsing beyond delegated checkpoint and codec libraries.
+4. LeRobot composition: **M0-qualified on 2026-09-10; compute paused.** Current
+   source supplies a concrete boundary from typed `info.json`, tasks and episode
+   metadata through metadata-derived Parquet loading, row tensorization, task
+   resolution, optional timestamp-driven video decoding and the training
+   DataLoader. The complete public tree exposes no fuzz target/reference and the
+   project is absent from the pinned OSS-Fuzz path. Arrow and FFmpeg fuzz their
+   own formats but not these LeRobot relationships. Known public episode,
+   schema, task, revision and timestamp failures are controls/dedup exclusions.
+   See `qualification/lerobot-composition-m0.md`. A separate R7 brief is required
+   before environment creation, seed execution, video work or mutation.
 5. CLIP depth remains parked. Reopen only under a separate brief after the local
    finding/fix disposition is decided and only with named semantic states; never
    extend merely to raise execution counts.

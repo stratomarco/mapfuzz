@@ -1,6 +1,6 @@
 # mapfuzz target status
 
-Reviewed against the tracked checkout on 2026-09-09. Historical findings remain
+Reviewed against the tracked checkout on 2026-09-10. Historical findings remain
 in the evidence ledger; lifecycle and compute decisions here control future work,
 not attribution. No target is promoted to automatic campaigns. Infrastructure
 and locked differential regression CI run on push/PR; this is not a claim of
@@ -18,7 +18,7 @@ evidence paths and compute decision is `targets/qualification.yaml`.
 | pytorch | paused | not current | Restricted-unpickler/meta-tensor paths exist; native storage reach remains unproved. | No compute. Recover provenance-backed deep harnesses, lock the environment and refresh M0. |
 | transformers_config | retired | not current | Self-generated base-config round trips do not reach malformed JSON or model-specific validation. | No compute. Replace with a newly scoped target rather than extend this generator. |
 | flax_checkpoint | paused | not current | Historical msgpack and structural paths lack a current locked environment and semantic controls. | No compute. Refresh M0/environment and prove accepted inputs plus named structural states. |
-| minja_template | archived | not current | Historical google/minja parser/render reach does not establish current llama.cpp Jinja reach. | No compute. Run current llama.cpp M0 only if a concrete public-coverage gap is identified. |
+| minja_template | archived; current successor M0 stopped | 2026-09-10 | Source confirms current llama.cpp `common/jinja` lex/parse/runtime and server consumption; the pinned OSS-Fuzz template target reaches only the legacy API. Runtime reach was not executed locally. | No compute. Same-boundary public fuzz-style tests and prior art prevent a complementary-coverage claim; reopen only after a meaningful scope or coverage change. |
 | tokenizers_differential | regression maintenance | not current | Fifteen locked WordPiece probes agree; broader Unicode/subword states remain unqualified. | Regression only. Refresh M0, widen matched configurations and add accepted-input/state metrics before campaigns. |
 
 ## Lifecycle meanings

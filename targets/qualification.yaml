@@ -121,14 +121,15 @@ targets:
 
   - id: minja_template
     lifecycle: archived
-    last_m0: not-current
-    consumer: historical google/minja parser and renderer, not current llama.cpp Jinja
+    last_m0: "2026-09-10"
+    consumer: current llama.cpp common/jinja lexer, parser and runtime through the server chat-template route; historical google/minja target remains archived
     trust_boundary: untrusted model-supplied chat template parsed and rendered at inference time
-    semantic_milestone: current llama.cpp parser and runtime reachability are not established
+    semantic_milestone: source-confirmed lex, parse, runtime render and server prompt consumption; no local build or runtime reachability was executed
     compute_decision: none
-    next_gate: current llama.cpp M0 only if public targets leave a demonstrated parser or runtime path uncovered
+    next_gate: reopen only after a meaningful scope or public-coverage change permits complementary coverage and excludes known same-boundary rediscovery
     controls: []
     evidence:
+      - docs/qualification/llama-jinja-m0.md
       - targets/minja_template/README.md
       - docs/TARGETS.md
 

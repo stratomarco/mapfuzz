@@ -42,7 +42,7 @@ Reference documents:
 | R3 | complete | Valid seed and semantic reachability | Tensor bytes were read; standard/Yi consumers constructed; negative controls failed earlier. |
 | R4 | stopped as designed | Short qualification runs | Batch 1 found an ASan null-read candidate; batches 2 and 3 were not run. |
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
-| R6 | CLIP parked; ExecuTorch and stable-diffusion.cpp M0s stopped | Depth campaign or next M0 | Both candidates have real consumers, but existing fuzz work or same-boundary prior art cannot be compared with an available harness and coverage map. No build/fuzz compute; next candidate requires explicit selection. |
+| R6 | CLIP parked; three candidate M0s stopped | Depth campaign or next M0 | ExecuTorch, stable-diffusion.cpp and current llama.cpp Jinja have real consumers, but existing fuzz work or same-boundary prior art prevents a defensible complementary-coverage claim. No build/fuzz compute; LeRobot requires explicit selection. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -126,8 +126,15 @@ These are candidates for future source verification, not verified-current gaps:
    corpus and coverage are unavailable, so the proposed work is neither proved
    duplicate nor proved uncovered. See `qualification/stable-diffusion-m0.md`;
    do not allocate build or fuzz compute.
-3. Current llama.cpp Jinja: proceed only if existing fuzz targets leave a
-   demonstrated parser/runtime/resource path unexercised.
+3. Current llama.cpp Jinja: **M0-STOP on 2026-09-10.** The pinned OSS-Fuzz
+   chat-template harness demonstrably reaches only the legacy predefined-template
+   API, not current `common/jinja`. Current upstream nevertheless contains direct
+   deterministic lexer/parser/runtime fuzz-style tests and substantial public
+   same-boundary crash/resource prior art, including open or closed-unmerged
+   recursion, `range()` and arithmetic guards. A generic target cannot establish
+   complementary coverage or avoid known rediscovery without the existing
+   harness/corpus/coverage map. See `qualification/llama-jinja-m0.md`; do not
+   allocate build or fuzz compute.
 4. LeRobot composition: revisit manifest/schema/dataset relationships only if
    current source supplies a concrete boundary. World-model runtimes need custom
    parsing beyond delegated checkpoint and codec libraries.

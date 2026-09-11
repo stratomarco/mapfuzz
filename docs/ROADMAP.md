@@ -12,11 +12,13 @@ independent review are complete. The first mutation batch found a candidate and
 triggered the mandatory stop. The target and local PR draft are parked; nothing
 was pushed, opened, published or sent upstream.
 
-Execution checkpoint, 2026-09-11: LeRobot R7 is locally qualified for the
-no-video semantic seed at implementation commit `f6818dba3707e194926827691dea6912cc2cbd11`.
-Two fresh environment resolutions produced the same normalized package set, and
-two fresh five-case matrices reached or rejected at the expected named stages.
-No new fault was observed. Target compute is paused before video or mutation;
+Execution checkpoint, 2026-09-11: LeRobot R8 is locally qualified for one
+deterministic video-bearing semantic seed at implementation commit
+`e06e0d887e16c122cb200e1bb3a43fa253eb7f9a`. Two exact-commit four-case
+matrices verified metadata, Parquet, H.264/PyAV decode, task lookup and a
+one-worker `DataLoader` under an effective 4 GiB/no-swap/one-CPU cgroup. The
+missing, truncated and out-of-tolerance controls stopped at their exact stages.
+No new fault was observed. Target compute remains paused before mutation;
 nothing was pushed, opened, published or sent upstream.
 
 ## Working agreement
@@ -37,6 +39,7 @@ Reference documents:
 - [Implemented hardening and its limits](HARDENING-2026-09-07.md)
 - [Daybreak pilot brief](tasks/DAYBREAK-CLIP-QUALIFICATION.md)
 - [LeRobot R7 seed brief](tasks/LEROBOT-COMPOSITION-SEED-QUALIFICATION.md)
+- [LeRobot R8 video-seed brief](tasks/LEROBOT-VIDEO-SEED-QUALIFICATION.md)
 - [Independent review template](tasks/RESEARCH-REVIEW-TEMPLATE.md)
 - Machine-checked target portfolio: `targets/qualification.yaml`
 
@@ -52,6 +55,7 @@ Reference documents:
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
 | R6 | LeRobot composition M0 qualified; compute paused | Next bounded package | Current source establishes an uncovered cross-file metadata/episode/Parquet/task/video boundary beyond Arrow/FFmpeg format fuzzing. Public same-boundary cases are dedup exclusions. No build/fuzz compute in M0. |
 | R7 | complete; compute paused | LeRobot environment and semantic seed | Locked Python 3.12/`uv` environment reproduced; a one-frame v3 bundle reached metadata→episode→data→tensor→task→one-worker DataLoader twice, and four controls failed at exact earlier stages. No video, mutation or finding. |
+| R8 | complete; compute paused | LeRobot video-bearing semantic seed | Pinned PyAV/libx264 wrote one H.264 frame; the non-streaming reader decoded it to the expected tensor and one-worker batch twice under hard limits. Missing, truncated and late-timestamp controls failed closed. No mutation or finding. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -144,7 +148,7 @@ These are candidates for future source verification, not verified-current gaps:
    complementary coverage or avoid known rediscovery without the existing
    harness/corpus/coverage map. See `qualification/llama-jinja-m0.md`; do not
    allocate build or fuzz compute.
-4. LeRobot composition: **R7 no-video seed qualified on 2026-09-11; compute paused.** Current
+4. LeRobot composition: **R8 video seed qualified on 2026-09-11; compute paused.** Current
    source supplies a concrete boundary from typed `info.json`, tasks and episode
    metadata through metadata-derived Parquet loading, row tensorization, task
    resolution, optional timestamp-driven video decoding and the training
@@ -152,14 +156,15 @@ These are candidates for future source verification, not verified-current gaps:
    project is absent from the pinned OSS-Fuzz path. Arrow and FFmpeg fuzz their
    own formats but not these LeRobot relationships. Known public episode,
    schema, task, revision and timestamp failures are controls/dedup exclusions.
-   R7 used the pinned source and lock to generate one deterministic v3 sample.
-   Two fresh replays reached metadata, episode/data loading, returned PyTorch
-   tensors, task resolution and a one-worker DataLoader. Invalid FPS, missing or
-   truncated data and invalid task-index controls stopped at their exact earlier
-   stages. See `qualification/lerobot-composition-m0.md` and
-   `qualification/lerobot-composition-seed.md`. A separate R8 brief and exact
-   native decoder environment are required before video; mutation remains
-   unauthorized.
+   R7 qualified the no-video path. R8 refreshed M0, pinned PyAV 15.1.0 and
+   bundled FFmpeg libraries, then generated one deterministic H.264 frame. Two
+   exact-commit replays reached the decoded float32 CHW tensor, task and
+   one-worker `DataLoader` under an effective 4 GiB/no-swap/one-CPU cgroup.
+   Missing MP4, truncated MP4 and late-timestamp controls stopped at exact
+   earlier stages. See `qualification/lerobot-composition-m0.md`,
+   `qualification/lerobot-composition-seed.md` and
+   `qualification/lerobot-composition-video-seed.md`. Mutation remains
+   unauthorized; the only next gate is a new maintainer lifecycle decision.
 5. CLIP depth remains parked. Reopen only under a separate brief after the local
    finding/fix disposition is decided and only with named semantic states; never
    extend merely to raise execution counts.

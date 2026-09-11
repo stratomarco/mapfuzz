@@ -135,23 +135,27 @@ targets:
 
   - id: lerobot_composition
     lifecycle: paused
-    last_m0: "2026-09-10"
+    last_m0: "2026-09-11"
     consumer: LeRobotDatasetMetadata and DatasetReader through metadata-derived Parquet loading, row tensorization, task and optional video resolution, and one-worker training DataLoader consumption
     trust_boundary: third-party or local LeRobot v3 dataset explicitly selected for training, evaluation, editing or visualization
-    semantic_milestone: locked no-video seed has metadata, tasks and episodes accepted; its referenced data row materializes to tensors with agreeing episode and frame indices; task resolves; one-worker DataLoader yields the sample; video decoding remains source-only
+    semantic_milestone: locked one-frame video seed has metadata, tasks and episodes accepted; its Parquet row and indices agree; metadata resolves one H.264 MP4; pinned PyAV returns the expected float32 CHW tensor; task resolves; one-worker DataLoader yields the same video, action and task
     compute_decision: none
-    next_gate: separately reviewed R8 video-seed brief with an exact native decoder environment and one valid plus missing or out-of-tolerance video control; no mutation work is authorized
+    next_gate: maintainer review and an explicit new lifecycle decision; no mutation work is authorized by R8 qualification
     controls:
       - invalid info or feature rank rejects before payload materialization
       - missing or truncated episode and data shards remain distinct from metadata acceptance
       - feature schema, episode bounds and task-index mismatches never count as a composed sample
-      - known public composition and timestamp cases are regression controls and dedup exclusions
-      - valid one-frame video and missing or out-of-tolerance video are a separate later gate
+      - missing MP4 stops at offline cache fallback before row or video consumption
+      - truncated MP4 raises PyAV InvalidDataError after row materialization but before decoded sample or task success
+      - out-of-tolerance timestamp raises FrameTimestampError after MP4 validation but before decoded sample or task success
+      - known public composition, streaming-video and timestamp cases are regression controls and dedup exclusions
     evidence:
       - docs/qualification/lerobot-composition-m0.md
       - docs/qualification/lerobot-composition-seed.md
+      - docs/qualification/lerobot-composition-video-seed.md
       - targets/lerobot_composition/README.md
       - targets/lerobot_composition/qualification/environment.yaml
+      - targets/lerobot_composition/qualification/video_environment.yaml
       - docs/TARGETS.md
 
   - id: tokenizers_differential

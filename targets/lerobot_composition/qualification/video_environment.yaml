@@ -1,0 +1,41 @@
+schema_version: 1
+upstream:
+  repository: https://github.com/huggingface/lerobot
+  commit: b6ec0060779550c0a157ae34feb89e0cf86012a8
+  source_archive: https://github.com/huggingface/lerobot/archive/b6ec0060779550c0a157ae34feb89e0cf86012a8.tar.gz
+  source_archive_sha256: 429a869b02b3fd8b9745f390951148f5185fce42d7bd7678337981d4510324d7
+  pyproject_sha256: d67a60c007eeb4401b29818d99a6ad94aa28c1f10beabdcf77c4da5d97f8e326
+  uv_lock_sha256: 4a56d47d2edfdc159bd137c854d37033028f38c4d9d57ec98284d8fce9ea2ccc
+toolchain:
+  python: ">=3.12"
+  uv_version: 0.11.30
+  uv_linux_x86_64_executable_sha256: 9a4299a0c3bcc01012acbcdae7b5655e5087e0e5d87459306736a1420a902b81
+decoder:
+  package: av==15.1.0
+  backend: pyav
+  encoder: libx264
+  codec: h264
+  pixel_format: yuv420p
+  libavcodec: 61.19.101
+  libavformat: 61.7.100
+  libavutil: 59.39.100
+  libswscale: 8.3.100
+execution:
+  cpu_only: true
+  cuda_visible_devices: ""
+  huggingface_hub_offline: true
+  frames: 1
+  episodes: 1
+  cameras: 1
+  dataloader_workers: 1
+  memory_max_bytes: 4294967296
+  memory_swap_max_bytes: 0
+  cpu_affinity_count: 1
+  replay_timeout_seconds: 60
+  suite_timeout_seconds: 360
+excluded:
+  - streaming dataset or streaming encoding
+  - model or policy construction
+  - training
+  - input mutation
+  - Hub dataset access

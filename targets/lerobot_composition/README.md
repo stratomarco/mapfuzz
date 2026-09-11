@@ -91,8 +91,10 @@ timestamp-out-of-range, nested-array, revision-race, row-group and scalar/vector
 cases remain regression controls and dedup exclusions. Current streaming-video
 issue 4524 and PR 4528 are also excluded. R7 and R8 found no new fault.
 
-R8 does not promote the target to mutation. The next possible gate is a new
-maintainer lifecycle decision after review; no campaign is implied. See
+R8 does not promote the target to mutation. A maintainer-authorized evidence
+review retained the paused lifecycle. Reopen only for a meaningful upstream
+boundary change or a separately reviewed brief with named semantic states,
+dedup rules and a new compute cap; no campaign is implied. See
 `../../docs/qualification/lerobot-composition-seed.md` and
 `../../docs/qualification/lerobot-composition-video-seed.md` for measured
 evidence.

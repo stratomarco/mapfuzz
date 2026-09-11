@@ -140,7 +140,7 @@ targets:
     trust_boundary: third-party or local LeRobot v3 dataset explicitly selected for training, evaluation, editing or visualization
     semantic_milestone: locked one-frame video seed has metadata, tasks and episodes accepted; its Parquet row and indices agree; metadata resolves one H.264 MP4; pinned PyAV returns the expected float32 CHW tensor; task resolves; one-worker DataLoader yields the same video, action and task
     compute_decision: none
-    next_gate: maintainer review and an explicit new lifecycle decision; no mutation work is authorized by R8 qualification
+    next_gate: paused by the 2026-09-11 maintainer-authorized disposition; reopen only for a meaningful upstream boundary change or a separately reviewed brief with named semantic states, dedup rules and a new compute cap
     controls:
       - invalid info or feature rank rejects before payload materialization
       - missing or truncated episode and data shards remain distinct from metadata acceptance

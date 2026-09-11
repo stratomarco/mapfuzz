@@ -55,7 +55,7 @@ Reference documents:
 | R5 | complete; parked | Independent review and disposition | Fix and controls independently replayed; current-master evidence reviewed twice; no external action. |
 | R6 | LeRobot composition M0 qualified; compute paused | Next bounded package | Current source establishes an uncovered cross-file metadata/episode/Parquet/task/video boundary beyond Arrow/FFmpeg format fuzzing. Public same-boundary cases are dedup exclusions. No build/fuzz compute in M0. |
 | R7 | complete; compute paused | LeRobot environment and semantic seed | Locked Python 3.12/`uv` environment reproduced; a one-frame v3 bundle reached metadata→episode→data→tensor→task→one-worker DataLoader twice, and four controls failed at exact earlier stages. No video, mutation or finding. |
-| R8 | complete; compute paused | LeRobot video-bearing semantic seed | Pinned PyAV/libx264 wrote one H.264 frame; the non-streaming reader decoded it to the expected tensor and one-worker batch twice under hard limits. Missing, truncated and late-timestamp controls failed closed. No mutation or finding. |
+| R8 | complete; maintainer-paused | LeRobot video-bearing semantic seed | Pinned PyAV/libx264 wrote one H.264 frame; the non-streaming reader decoded it to the expected tensor and one-worker batch twice under hard limits. Missing, truncated and late-timestamp controls failed closed. Maintainer-authorized review retained pause; no mutation or finding. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -163,8 +163,10 @@ These are candidates for future source verification, not verified-current gaps:
    Missing MP4, truncated MP4 and late-timestamp controls stopped at exact
    earlier stages. See `qualification/lerobot-composition-m0.md`,
    `qualification/lerobot-composition-seed.md` and
-   `qualification/lerobot-composition-video-seed.md`. Mutation remains
-   unauthorized; the only next gate is a new maintainer lifecycle decision.
+   `qualification/lerobot-composition-video-seed.md`. A maintainer-authorized
+   evidence review retained the paused lifecycle. Reopen only for a meaningful
+   upstream boundary change or a separately reviewed brief with named semantic
+   states, dedup rules and a new compute cap. Mutation remains unauthorized.
 5. CLIP depth remains parked. Reopen only under a separate brief after the local
    finding/fix disposition is decided and only with named semantic states; never
    extend merely to raise execution counts.

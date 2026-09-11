@@ -152,6 +152,13 @@ Python timeout and each suite a 360-second host timeout.
   sanitizer, mutation, streaming dataset, training or policy execution. One
   frame cannot establish broad codec/dataset compatibility. Public prior-art
   review is evidence of observed records, not an exhaustive proof of absence.
+- Maintainer-authorized disposition review: on 2026-09-11, after implementation
+  commit `e06e0d8` and report commit `848acb6`, Codex compared the brief and
+  tracked diff with both raw matrix logs and both focused-test logs. All four
+  evidence hashes and eight case outcomes matched; no tracked generated payload,
+  Hub upload, streaming, mutation or campaign path was present. This is a
+  documented self-review under maintainer authorization, **not** independent
+  review. The lifecycle decision is **PAUSE**.
 
 ## Decision
 
@@ -161,11 +168,11 @@ and non-streaming consumer reached all six positive milestones twice under hard
 limits, while each control failed at its exact earlier stage and exception
 class. No new fault was observed.
 
-The single bounded next action is maintainer review of R8 and an explicit
-continue, pause, archive or retire decision. Any mutation proposal requires a
-new brief with named semantic states, dedup rules and a fresh compute budget.
-This report authorizes no campaign, merge, push, publication, disclosure, pull
-request, issue, message or upstream contact.
+The maintainer-authorized decision is to pause R8. Reopen only for a meaningful
+upstream boundary change or a separately reviewed brief with named semantic
+states, dedup rules and a fresh compute cap. This report authorizes no campaign,
+merge, push, publication, disclosure, pull request, issue, message or upstream
+contact.
 
 ## Local evidence inventory
 

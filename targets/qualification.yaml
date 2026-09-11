@@ -138,9 +138,9 @@ targets:
     last_m0: "2026-09-10"
     consumer: LeRobotDatasetMetadata and DatasetReader through metadata-derived Parquet loading, row tensorization, task and optional video resolution, and one-worker training DataLoader consumption
     trust_boundary: third-party or local LeRobot v3 dataset explicitly selected for training, evaluation, editing or visualization
-    semantic_milestone: metadata, tasks and episodes accepted; referenced data row materialized to tensors; episode and frame indices agree; task resolves; one-worker DataLoader yields the sample; video decoding is a later phase
+    semantic_milestone: locked no-video seed has metadata, tasks and episodes accepted; its referenced data row materializes to tensors with agreeing episode and frame indices; task resolves; one-worker DataLoader yields the sample; video decoding remains source-only
     compute_decision: none
-    next_gate: separately reviewed Python 3.12 plus uv.lock build-and-seed brief proving a minimal no-video composed sample and negative controls before video or mutation work
+    next_gate: separately reviewed R8 video-seed brief with an exact native decoder environment and one valid plus missing or out-of-tolerance video control; no mutation work is authorized
     controls:
       - invalid info or feature rank rejects before payload materialization
       - missing or truncated episode and data shards remain distinct from metadata acceptance
@@ -149,7 +149,9 @@ targets:
       - valid one-frame video and missing or out-of-tolerance video are a separate later gate
     evidence:
       - docs/qualification/lerobot-composition-m0.md
+      - docs/qualification/lerobot-composition-seed.md
       - targets/lerobot_composition/README.md
+      - targets/lerobot_composition/qualification/environment.yaml
       - docs/TARGETS.md
 
   - id: tokenizers_differential

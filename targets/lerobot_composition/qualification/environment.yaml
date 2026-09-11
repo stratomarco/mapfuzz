@@ -1,0 +1,38 @@
+schema_version: 1
+upstream:
+  repository: https://github.com/huggingface/lerobot
+  commit: 71a11efe77f55e61f3ab2ce45b40da8cf626afa9
+  source_archive: https://github.com/huggingface/lerobot/archive/71a11efe77f55e61f3ab2ce45b40da8cf626afa9.tar.gz
+  source_archive_sha256: b0bb1866b7879e7307221fb7822c54a41cf1234a754de878f4bf5de1e18136d5
+  pyproject_sha256: d67a60c007eeb4401b29818d99a6ad94aa28c1f10beabdcf77c4da5d97f8e326
+  uv_lock_sha256: 4a56d47d2edfdc159bd137c854d37033028f38c4d9d57ec98284d8fce9ea2ccc
+toolchain:
+  python: ">=3.12"
+  uv_version: 0.11.30
+  uv_linux_x86_64_executable_sha256: 9a4299a0c3bcc01012acbcdae7b5655e5087e0e5d87459306736a1420a902b81
+dependency_groups:
+  - dataset
+  - test
+uv_sync_flags:
+  - --locked
+  - --extra
+  - dataset
+  - --extra
+  - test
+  - --no-dev
+execution:
+  cpu_only: true
+  cuda_visible_devices: ""
+  huggingface_hub_offline: true
+  frames: 1
+  episodes: 1
+  dataloader_workers: 1
+  video_backend: pyav
+  replay_timeout_seconds: 60
+  suite_timeout_seconds: 360
+excluded:
+  - video creation or decoding
+  - model or policy construction
+  - training
+  - input mutation
+  - Hub dataset access

@@ -21,6 +21,15 @@ missing, truncated and out-of-tolerance controls stopped at their exact stages.
 No new fault was observed. Target compute remains paused before mutation;
 nothing was pushed, opened, published or sent upstream.
 
+Execution checkpoint, 2026-09-12: the current Hugging Face Tokenizers M0
+refresh stopped before build or replay. Current source confirms the real
+`Tokenizer::from_bytes` construction boundary, but open official BPE panic
+reports/fixes and existing mapfuzz decoder/normalizer findings cover the
+obvious same-boundary denial-of-service work. The tracked 0.21.4 harness also
+lacks a complete dependency lock. No complementary component state, new
+finding or qualification compute was established; nothing was pushed, opened,
+published or sent upstream.
+
 ## Working agreement
 
 The planning/review task owns priorities, acceptance criteria and independent
@@ -40,6 +49,7 @@ Reference documents:
 - [Daybreak pilot brief](tasks/DAYBREAK-CLIP-QUALIFICATION.md)
 - [LeRobot R7 seed brief](tasks/LEROBOT-COMPOSITION-SEED-QUALIFICATION.md)
 - [LeRobot R8 video-seed brief](tasks/LEROBOT-VIDEO-SEED-QUALIFICATION.md)
+- [Tokenizers current M0 brief](tasks/TOKENIZERS-M0-REFRESH.md)
 - [Independent review template](tasks/RESEARCH-REVIEW-TEMPLATE.md)
 - Machine-checked target portfolio: `targets/qualification.yaml`
 
@@ -56,6 +66,7 @@ Reference documents:
 | R6 | LeRobot composition M0 qualified; compute paused | Next bounded package | Current source establishes an uncovered cross-file metadata/episode/Parquet/task/video boundary beyond Arrow/FFmpeg format fuzzing. Public same-boundary cases are dedup exclusions. No build/fuzz compute in M0. |
 | R7 | complete; compute paused | LeRobot environment and semantic seed | Locked Python 3.12/`uv` environment reproduced; a one-frame v3 bundle reached metadata→episode→data→tensor→task→one-worker DataLoader twice, and four controls failed at exact earlier stages. No video, mutation or finding. |
 | R8 | complete; maintainer-paused | LeRobot video-bearing semantic seed | Pinned PyAV/libx264 wrote one H.264 frame; the non-streaming reader decoded it to the expected tensor and one-worker batch twice under hard limits. Missing, truncated and late-timestamp controls failed closed. Maintainer-authorized review retained pause; no mutation or finding. |
+| R9 | M0-STOP | Tokenizers current M0 refresh | Current `from_bytes` and BPE/component construction paths were pinned, but active public BPE reports/fixes and existing C-0001 through C-0003 cover the same load-time panic families. The historical 0.21.4 harness has no complete lock. No build, replay, mutation or finding. |
 
 R1-R4 form the first Daybreak pilot. R1 may legitimately end the pilot early;
 a well-supported decision that the surface duplicates existing work is useful.
@@ -177,11 +188,20 @@ the exact consumer, trust boundary, semantic milestone, controls, evidence and
 compute decision. A duplicate, uncertain boundary or missing immutable
 prerequisite is an `M0-STOP`, not an invitation to switch targets silently.
 
-Tokenizers remains regression maintenance; its Rust build needs a reviewed lock
-and toolchain qualification. PyTorch remains paused while deep sources and native
-coverage are missing. GGUF no_alloc, Flax and archived minja/gguf-py work do not
-receive more campaigns solely because their harnesses exist. The retired base
-config generator remains retired. See TARGETS.md for all ten directories.
+Tokenizers is **M0-STOP on 2026-09-12** and remains regression maintenance.
+Current source still exposes the reported decoder/Precompiled-normalizer
+expect-on-deserialize sites, while two open issues and three open fixes cover a
+current BPE construction panic at the same `tokenizer.json` load boundary.
+Public-tree and OSS-Fuzz absence do not establish an uncovered surface. Reopen
+only with a current complete Rust dependency lock and a separately named
+non-BPE, non-decoder, non-Precompiled-normalizer state with its own semantic
+milestone, controls and dedup rationale. See
+`qualification/tokenizers-m0-refresh.md`; do not allocate qualification compute.
+
+PyTorch remains paused while deep sources and native coverage are missing. GGUF
+no_alloc, Flax and archived minja/gguf-py work do not receive more campaigns
+solely because their harnesses exist. The retired base config generator remains
+retired. See TARGETS.md for all ten directories.
 
 ## Research and disclosure limits
 

@@ -1,6 +1,6 @@
 # mapfuzz target status
 
-Reviewed against the tracked checkout on 2026-09-10. Historical findings remain
+Reviewed against the tracked checkout on 2026-09-12. Historical findings remain
 in the evidence ledger; lifecycle and compute decisions here control future work,
 not attribution. No target is promoted to automatic campaigns. Infrastructure
 and locked differential regression CI run on push/PR; this is not a claim of
@@ -12,7 +12,7 @@ evidence paths and compute decision is `targets/qualification.yaml`.
 | Directory | Lifecycle | Last M0 | Semantic milestone | Compute decision and next gate |
 |---|---|---|---|---|
 | clip_mmproj | qualified locally; parked | 2026-09-09 | Standard and Yi tensor bytes are synchronously read and a CPU vision consumer is constructed; incomplete standard MLP rejects before reads. | Parked. No more mutations. Maintainer may later choose the local normal hardening PR draft through official channels. |
-| tokenizers | regression maintenance | 2026-08-13; historical, refresh required | Valid seeds exercise `Tokenizer::from_bytes`; breadth across named component families is not yet measured. | Regression only. Refresh M0 and pin dated Rust/cargo-fuzz plus the complete dependency lock before qualification compute. |
+| tokenizers | regression maintenance; current M0 stopped | 2026-09-12 | Current source confirms `Tokenizer::from_bytes` and component construction; the six tracked seeds and 0.21.4 harness are historical only, with no current replay or named complementary state. | Regression only. Reopen qualification after active BPE prior art changes and only with a current complete lock plus a named non-BPE/non-decoder/non-Precompiled-normalizer state, positive seed and earlier-failing control. |
 | gguf | paused | not current | Metadata and descriptors only under `no_alloc=true`; allocation and a downstream consumer remain unproved. | No compute. Refresh M0 and prove a named consumer with controls. |
 | gguf_py_reader | archived | not current | Valid-seed acceptance and downstream consumer reach are not tracked. | No compute. Reopen only after meaningful upstream changes with exact pins and controls. |
 | pytorch | paused | not current | Restricted-unpickler/meta-tensor paths exist; native storage reach remains unproved. | No compute. Recover provenance-backed deep harnesses, lock the environment and refresh M0. |

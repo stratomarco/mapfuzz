@@ -43,14 +43,19 @@ targets:
 
   - id: tokenizers
     lifecycle: regression-maintenance
-    last_m0: "2026-08-13"
+    last_m0: "2026-09-12"
     consumer: tokenizers Tokenizer::from_bytes deserialization and construction
     trust_boundary: untrusted tokenizer.json bytes loaded by an application
-    semantic_milestone: valid seeds construct tokenizer models across named model and component families
+    semantic_milestone: historical 0.21.4 seeds reach generic Tokenizer::from_bytes; current 0.23.2-dev.0 construction is source-confirmed only, with no current replay or complementary named component state
     compute_decision: regression-only
-    next_gate: refresh current M0, pin dated Rust and cargo-fuzz tools, and commit a reviewed dependency lock
-    controls: []
+    next_gate: reopen qualification only after active BPE prior art changes and a separate brief names a non-BPE, non-decoder, non-Precompiled-normalizer state, current complete dependency lock, valid seed, earlier-failing control, and independent dedup rationale
+    controls:
+      - existing decoder and Precompiled-normalizer panic families are dedup exclusions
+      - current public BPE merge-construction panic reports and fixes are dedup exclusions
+      - historical valid seeds cannot satisfy a current-version positive control without replay
     evidence:
+      - docs/tasks/TOKENIZERS-M0-REFRESH.md
+      - docs/qualification/tokenizers-m0-refresh.md
       - targets/tokenizers/README.md
       - docs/TARGETS.md
 

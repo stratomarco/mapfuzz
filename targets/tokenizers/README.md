@@ -9,15 +9,29 @@
 
 The entry point was read from `tokenizer/mod.rs:473` in the crate source, not assumed. `from_bytes` runs the full deserialization and tokenizer construction over an in-memory buffer, so the harness never touches the filesystem per input. If the pin is bumped, re-verify the signature before trusting the harness.
 
-## M0 audit result
+## Current M0 result
 
-Historical check recorded 2026-08-13; refresh before a new campaign:
+The 2026-09-12 refresh is **M0-STOP** against Tokenizers
+`6cfd9d385ca0ed91c10b49f0ce97d02cfde1b607` and OSS-Fuzz
+`4e65aea32254fe988ac4b84dbb088d2d08d789e7`:
 
-- In-repo fuzz target: none. A fresh clone of huggingface/tokenizers contains no `fuzz/` directory and no fuzz target.
-- OSS-Fuzz: not a project. The OSS-Fuzz `projects/tokenizers/` path returns 404 (confirmed against a positive control, `sentencepiece`, which returns 200).
-- Published fuzzing work: none surfaced in search.
+- The complete public Tokenizers tree contains no fuzz-named path, and the exact
+  OSS-Fuzz `projects/tokenizers/project.yaml` lookup returns 404 while the
+  SentencePiece positive control returns 200. These inventory results do not
+  prove that no private, differently named or external fuzzing exists.
+- `Tokenizer::from_bytes` remains the exact in-memory deserialization and
+  construction entry point on current main.
+- Open official issues 2094 and 2198 plus open PRs 2104, 2219 and 2333 cover a
+  current BPE merge-construction panic at this same load boundary.
+- The current decoder and Precompiled-normalizer expect-on-deserialize sites are
+  already represented by verified, reported claims C-0001 and C-0002; C-0003
+  bounds that historically probed component class.
+- The tracked harness pins 0.21.4 and has no `fuzz/Cargo.lock`. Its six seeds are
+  historical regression inputs, not evidence of current-main reachability.
 
-Conclusion: open ground, in contrast to safetensors (which ships its own fuzz target and runs a per-commit security audit) and SentencePiece (already in OSS-Fuzz). Caveat: absence of public evidence is not proof the crate is untouched; private or academic fuzzing may exist. M0 tells us the ground is open, not that bugs are guaranteed.
+No complementary component/state survived the dedup gate, so no build, seed
+replay or mutation ran. See
+`../../docs/qualification/tokenizers-m0-refresh.md` for the complete packet.
 
 ## Bug classes targeted
 
@@ -36,7 +50,12 @@ A panic reached from a malicious tokenizer file is a denial-of-service finding. 
 
 ## Seed corpus
 
-`corpus/seed_tokenizer.json` is a minimal valid tokenizer (WordLevel model, Whitespace pre-tokenizer, three-entry vocab), generated with the official Python `tokenizers` writer. No proprietary vocab. Add more seeds covering BPE, WordPiece, Unigram, byte-level pre-tokenizers, and populated normalizer and post-processor sections to give the fuzzer more structure to mutate.
+`corpus/seed_tokenizer.json` is a minimal valid tokenizer (WordLevel model,
+Whitespace pre-tokenizer, three-entry vocab), generated with the official
+Python `tokenizers` writer. No proprietary vocab. The tracked corpus remains
+available for deterministic historical regression. Do not extend it for a new
+campaign until a separate qualification brief passes the current dedup and
+semantic-control gates.
 
 ## Build and run
 
@@ -48,8 +67,11 @@ resolution before promotion; see ../../docs/TARGETS.md.
 
 ## Status
 
-Regression maintenance; automatic campaigns paused. Findings 0002 and 0003 were
-reported on 2026-08-13 according to the ledger. Public reproducers remain withheld;
-current upstream response/fix status has not been refreshed in this repair.
-Private blockers stay local. Six synthetic JSON seeds are tracked. Broader
-features and current-version checks require separate qualification.
+Regression maintenance; current qualification M0 stopped and automatic
+campaigns remain paused. Findings 0002 and 0003 were reported on 2026-08-13
+according to the ledger; public reproducers remain withheld. The 2026-09-12
+refresh inspected current source and official public BPE prior art but did not
+reproduce any condition or update an evidence claim. Reopen only after the
+active BPE issue/fix state changes and a separate brief defines a current locked
+environment plus a non-BPE, non-decoder, non-Precompiled-normalizer semantic
+state and controls.
